@@ -207,7 +207,11 @@ def _score_route(
     matched_sensors = {}
 
     for segment in segment_records:
-        for sensor in segment.pop("_matched_sensors"):
+        matched_for_segment = segment.pop("_matched_sensors")
+        segment["matched_sensor_ids"] = [
+            str(sensor["id"]) for sensor in matched_for_segment
+        ]
+        for sensor in matched_for_segment:
             matched_sensors[str(sensor["id"])] = sensor
 
     public_sensors = [

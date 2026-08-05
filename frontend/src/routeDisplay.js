@@ -79,12 +79,33 @@ export function isConfirmedLocation(location) {
   );
 }
 
-export function buildRouteRequest(origin, destination, crowdTolerance) {
-  return {
+export function buildRouteRequest(
+  origin,
+  destination,
+  crowdTolerance,
+  departureTime = null,
+) {
+  const request = {
     start: { ...origin },
     end: { ...destination },
     crowd_tolerance: crowdTolerance,
   };
+  if (departureTime) {
+    request.departure_time = departureTime;
+  }
+  return request;
+}
+
+export function toTimezoneAwareDeparture(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function selectRouteDeparture(inputValue, preservedValue = null) {
+  return toTimezoneAwareDeparture(inputValue) || preservedValue || null;
 }
 
 export function canStartReroute(rerouteInProgress) {

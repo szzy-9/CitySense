@@ -1,11 +1,15 @@
 import httpx
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from sqlalchemy.exc import SQLAlchemyError
 
 from backend.config import Config, ROOT_DIR
-from backend.database import database_health, initialize_database, safe_rollback
-from backend.models import RouteSearch, db
+from backend.database import database_health, initialize_database
+from backend.models import db
+from backend.repositories import (
+    data_table_counts,
+    database_has_refuges,
+    record_route_search,
+)
 from backend.services.city_data import get_pedestrian_snapshot
 from backend.services.geocoding import (
     MAX_AUTOCOMPLETE_RESULTS,
@@ -17,7 +21,8 @@ from backend.services.locations import (
     validate_route_coordinates,
     validate_search_query,
 )
-from backend.services.refuges import find_nearest_refuge, list_refuges
+from backend.services.prediction import add_historical_predictions, parse_departure_time
+from backend.services.refuges import get_refuges
 from backend.services.routing import get_walking_routes
 from backend.services.scoring import monitor_route, score_routes
 
@@ -93,11 +98,29 @@ def create_app(test_config=None):
     @app.get("/api/health")
     def health():
         database_status = database_health()
+        data_counts = data_table_counts()
         return jsonify(
             {
                 "status": "ok" if database_status == "connected" else "degraded",
                 "service": "CitySense API",
                 "database": {"status": database_status},
+                "data": {
+                    name: {"loaded": count is not None and count > 0}
+                    for name, count in data_counts.items()
+                },
+            }
+        )
+
+    @app.get("/api/data/status")
+    def data_status():
+        counts = data_table_counts()
+        return jsonify(
+            {
+                name: {
+                    "loaded": count is not None and count > 0,
+                    "row_count": count,
+                }
+                for name, count in counts.items()
             }
         )
 
@@ -153,8 +176,8 @@ def create_app(test_config=None):
             except ValueError as error:
                 return _error(str(error), 400)
 
-        refuge_list = list_refuges(origin)
-        nearest_refuge = find_nearest_refuge(origin) if origin else None
+        refuge_list, refuge_source = get_refuges(origin)
+        nearest_refuge = refuge_list[0] if origin and refuge_list else None
         calculation_basis = None
         if origin:
             calculation_basis = f"Distance and direction from {origin['label']}."
@@ -166,10 +189,16 @@ def create_app(test_config=None):
                 "origin": origin,
                 "calculation_basis": calculation_basis,
                 "data_status": {
-                    "source": "curated_prototype",
-                    "verified": False,
+                    "source": refuge_source.lower(),
+                    "verified": (
+                        all(refuge.get("verified") for refuge in refuge_list)
+                        if refuge_source == "DATABASE" and refuge_list
+                        else False
+                    ),
                     "message": (
-                        "Prototype refuge information. Check local conditions."
+                        "Database refuge information. Check local conditions."
+                        if refuge_source == "DATABASE"
+                        else "Prototype refuge information. Check local conditions."
                     ),
                 },
             }
@@ -189,6 +218,12 @@ def create_app(test_config=None):
             return _error("Crowd tolerance must be Low, Medium, or High.", 400)
 
         crowd_tolerance = crowd_tolerance.upper()
+        try:
+            departure_time, departure_time_defaulted = parse_departure_time(
+                payload.get("departure_time")
+            )
+        except ValueError as error:
+            return _error(str(error), 400)
         try:
             start = validate_location(payload.get("start"), "Start")
             end = validate_location(payload.get("end"), "Destination")
@@ -214,20 +249,37 @@ def create_app(test_config=None):
             route_source=route_source,
             crowd_tolerance=crowd_tolerance,
         )
-
-        search = RouteSearch(
-            start_source=start["source"],
-            end_source=end["source"],
-            fastest_route_id=fastest_id,
-            calmest_route_id=calmest_id,
-            route_source=route_source,
-            pedestrian_source=pedestrian_snapshot["source"],
+        add_historical_predictions(
+            scored_routes,
+            departure_time,
+            crowd_tolerance,
+            _prediction_thresholds(app.config),
         )
-        db.session.add(search)
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            safe_rollback()
+
+        selected_route = next(
+            route for route in scored_routes if route["id"] == recommended_id
+        )
+        if not record_route_search(
+            {
+                "start_source": start["source"],
+                "end_source": end["source"],
+                "fastest_route_id": fastest_id,
+                "calmest_route_id": calmest_id,
+                "route_source": route_source,
+                "pedestrian_source": pedestrian_snapshot["source"],
+                "selected_route_type": "RECOMMENDED",
+                "confidence": selected_route.get("confidence"),
+                "route_count": len(scored_routes),
+                "used_historical_prediction": selected_route[
+                    "historical_prediction_available"
+                ],
+                "prediction_confidence": (
+                    selected_route["prediction_confidence"]
+                    if selected_route["historical_prediction_available"]
+                    else None
+                ),
+            }
+        ):
             app.logger.warning("Database route search commit failed")
             return _error("The database is temporarily unavailable.", 503)
 
@@ -244,6 +296,8 @@ def create_app(test_config=None):
                 "sensors": _unique_route_sensors(scored_routes),
                 "request_settings": {
                     "crowd_tolerance": crowd_tolerance,
+                    "departure_time": departure_time.isoformat(),
+                    "departure_time_defaulted": departure_time_defaulted,
                     "applied_to_routing": True,
                     "message": (
                         "The selected crowd tolerance affects the default recommendation."
@@ -261,6 +315,20 @@ def create_app(test_config=None):
                     "pedestrian_message": pedestrian_snapshot["message"],
                     "updated_at": pedestrian_snapshot["updated_at"],
                     "sensor_count": len(pedestrian_snapshot["sensors"]),
+                    "sensor_location_source": pedestrian_snapshot.get(
+                        "sensor_location_source", "FALLBACK"
+                    ),
+                    "historical_profile_source": (
+                        "DATABASE"
+                        if any(
+                            route["historical_prediction_available"]
+                            for route in scored_routes
+                        )
+                        else "NO_DATA"
+                    ),
+                    "refuge_source": (
+                        "DATABASE" if database_has_refuges() else "CURATED_PROTOTYPE"
+                    ),
                     "cache_status": pedestrian_snapshot.get("cache_status"),
                     "is_fallback": used_fallback,
                 },
@@ -333,6 +401,16 @@ def _unique_route_sensors(routes):
         for sensor in route.get("matched_sensors", []):
             sensors[sensor["id"]] = sensor
     return list(sensors.values())
+
+
+def _prediction_thresholds(config):
+    return {
+        "medium_min_samples": config["PREDICTION_MEDIUM_MIN_SAMPLES"],
+        "high_min_samples": config["PREDICTION_HIGH_MIN_SAMPLES"],
+        "medium_max_cv": config["PREDICTION_MEDIUM_MAX_CV"],
+        "high_max_cv": config["PREDICTION_HIGH_MAX_CV"],
+        "minimum_alert_confidence": config["PREDICTION_MIN_ALERT_CONFIDENCE"],
+    }
 
 
 if __name__ == "__main__":

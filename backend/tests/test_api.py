@@ -47,11 +47,10 @@ def test_health_check_reports_database_degraded_without_details(
     body = response.get_json()
 
     assert response.status_code == 200
-    assert body == {
-        "status": "degraded",
-        "service": "CitySense API",
-        "database": {"status": "degraded"},
-    }
+    assert body["status"] == "degraded"
+    assert body["service"] == "CitySense API"
+    assert body["database"] == {"status": "degraded"}
+    assert body["data"]["sensor_locations"]["loaded"] is False
     assert "url" not in str(body).lower()
     assert "password" not in str(body).lower()
 
@@ -187,6 +186,14 @@ def test_fallback_returns_two_scored_routes_for_coordinates(client):
         assert route["recommendation_reason"]
         assert route["sensor_count"] == route["matched_sensor_count"]
         assert route["sensory_level"] in {"LOW", "MODERATE", "HIGH", "NO_DATA"}
+        assert route["historical_prediction_available"] is False
+        assert route["predicted_peak"] == "NO_DATA"
+        assert route["predicted_count"] is None
+        assert route["prediction_confidence"] == "LOW"
+        assert route["prediction_alert"] is None
+        assert route["prediction_unavailable_reason"] == (
+            "Historical profile data has not been loaded."
+        )
 
     assert "Fastest" in roles
     assert "Calmest" in roles
@@ -231,6 +238,35 @@ def test_invalid_crowd_tolerance_is_rejected(client):
 
     assert response.status_code == 400
     assert "Low, Medium, or High" in response.get_json()["error"]
+
+
+def test_departure_time_must_include_a_timezone(client):
+    response = client.post(
+        "/api/routes",
+        json=route_payload(departure_time="2026-08-06T09:30:00"),
+    )
+
+    assert response.status_code == 400
+    assert "timezone" in response.get_json()["error"]
+
+
+def test_missing_departure_time_uses_a_documented_default(client):
+    response = client.post("/api/routes", json=route_payload())
+    settings = response.get_json()["request_settings"]
+
+    assert response.status_code == 200
+    assert settings["departure_time_defaulted"] is True
+    assert "+" in settings["departure_time"]
+
+
+def test_data_status_reports_safe_counts(client):
+    response = client.get("/api/data/status")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["sensor_locations"] == {"loaded": False, "row_count": 0}
+    assert "url" not in str(body).lower()
+    assert "password" not in str(body).lower()
 
 
 def test_reroute_source_uses_current_position_and_preserves_destination(client):

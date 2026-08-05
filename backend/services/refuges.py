@@ -1,16 +1,25 @@
 import math
 
 from backend.data.refuges import REFUGES
+from backend.repositories import list_database_refuges
 from backend.services.locations import haversine_distance
 
 
-def list_refuges(origin=None):
+def get_refuges(origin=None):
+    database_refuges = list_database_refuges()
+    source = "DATABASE" if database_refuges else "CURATED_PROTOTYPE"
+    source_refuges = database_refuges or REFUGES
     refuges = [
         _with_distance(refuge, origin) if origin else dict(refuge)
-        for refuge in REFUGES
+        for refuge in source_refuges
     ]
     if origin:
         refuges.sort(key=lambda refuge: refuge["distance_meters"])
+    return refuges, source
+
+
+def list_refuges(origin=None):
+    refuges, _source = get_refuges(origin)
     return refuges
 
 

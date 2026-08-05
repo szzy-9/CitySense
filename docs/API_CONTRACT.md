@@ -16,9 +16,19 @@ Reports application and database availability without connection details.
 {
   "status": "ok | degraded",
   "service": "CitySense API",
-  "database": { "status": "connected | degraded" }
+  "database": { "status": "connected | degraded" },
+  "data": {
+    "sensor_locations": { "loaded": false },
+    "pedestrian_readings": { "loaded": false },
+    "historical_profiles": { "loaded": false },
+    "refuges": { "loaded": false }
+  }
 }
 ```
+
+## `GET /api/data/status`
+
+Returns safe database row counts and loaded booleans for the four data tables. It never returns connection details, raw rows, or credentials.
 
 ## `GET /api/geocode/autocomplete?q=...`
 
@@ -29,7 +39,7 @@ Reports application and database availability without connection details.
 
 ## `GET /api/refuges`
 
-Without coordinates, returns the prototype list. With validated `lat`, `lon`, `label`, and `source`, returns a distance-sorted list and `nearest_refuge`.
+Without coordinates, returns the active database list when populated, otherwise the curated prototype list. With validated `lat`, `lon`, `label`, and `source`, returns a distance-sorted list and `nearest_refuge`.
 
 Distances are straight-line distances. Refuge records are unverified prototypes.
 
@@ -51,9 +61,12 @@ Request:
     "lon": 144.97,
     "source": "autocomplete | heigit_pelias | current_location | reroute"
   },
-  "crowd_tolerance": "LOW | MEDIUM | HIGH"
+  "crowd_tolerance": "LOW | MEDIUM | HIGH",
+  "departure_time": "2026-08-06T09:30:00+10:00"
 }
 ```
+
+`departure_time` is optional but must include a timezone offset when supplied. When absent, Flask uses the current time in `Australia/Melbourne` and returns `departure_time_defaulted: true` in `request_settings`.
 
 Each returned route includes:
 
@@ -65,7 +78,16 @@ Each returned route includes:
   "distance_meters": 1000,
   "duration_minutes": 12.5,
   "steps": [],
-  "segments": [],
+  "segments": [
+    {
+      "predicted_count": 320,
+      "predicted_band": "MODERATE",
+      "prediction_confidence": "MEDIUM",
+      "prediction_basis": "Historical median for the same weekday and hour",
+      "predicted_for": "2026-08-06T10:00:00+10:00",
+      "profile_sensor_count": 2
+    }
+  ],
   "sensory_level": "LOW | MODERATE | HIGH | NO_DATA",
   "peak_load": "LOW | MODERATE | HIGH | NO_DATA",
   "sensory_indicator": "LOW | HIGH | NO_DATA",
@@ -74,9 +96,28 @@ Each returned route includes:
   "confidence_reasons": [],
   "recommended": true,
   "recommendation_reason": "Explanation",
-  "congestion_avoidable": true
+  "congestion_avoidable": true,
+  "historical_prediction_available": true,
+  "predicted_peak": "LOW | MODERATE | HIGH | NO_DATA",
+  "predicted_count": 320,
+  "prediction_confidence": "LOW | MEDIUM | HIGH",
+  "prediction_basis": "Historical median for the same weekday and hour",
+  "prediction_unavailable_reason": null,
+  "prediction_alert": {
+    "triggered": true,
+    "predicted_condition": "HIGH",
+    "segment_index": 3,
+    "lead_minutes": 25,
+    "confidence": "MEDIUM",
+    "message": "Historical patterns suggest High crowd levels in about 25 minutes.",
+    "reroute_available": true
+  }
 }
 ```
+
+When no matching profile exists, prediction is exactly unavailable: `historical_prediction_available=false`, `predicted_peak=NO_DATA`, `predicted_count=null`, `prediction_confidence=LOW`, `prediction_alert=null`, and `prediction_unavailable_reason="Historical profile data has not been loaded."`. No zero or generated value substitutes for missing data.
+
+Prediction uses route-segment ETA, matched sensor ID, Melbourne weekday/hour, and the imported historical median. An alert is present only when the predicted band exceeds tolerance, lead time is 5–60 minutes, and configured confidence is sufficient. Prototype route geometry is limited to LOW prediction confidence and cannot trigger a prediction alert.
 
 `NO_DATA` is never equivalent to `LOW`.
 
@@ -86,7 +127,7 @@ Tolerance mapping:
 - MEDIUM accepts LOW or MODERATE.
 - HIGH accepts LOW, MODERATE, or HIGH.
 
-The response also includes `recommended_route_id`, `request_settings`, sensor markers, and source/update metadata.
+The response also includes `recommended_route_id`, `request_settings`, sensor markers, and separate route, pedestrian, sensor-location, historical-profile, and refuge source/update metadata.
 
 ## `POST /api/routes/monitor`
 
@@ -121,4 +162,3 @@ Response:
   "message": "High crowd levels were detected ahead."
 }
 ```
-

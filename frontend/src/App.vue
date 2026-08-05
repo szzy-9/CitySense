@@ -20,6 +20,7 @@ import {
   preserveCurrentRouteResult,
   remainingRouteCoordinates,
   shouldShowMonitorAlert,
+  selectRouteDeparture,
 } from "./routeDisplay.js";
 
 
@@ -32,6 +33,7 @@ const endLocation = ref(null);
 const currentLocation = ref(null);
 const currentAccuracy = ref(null);
 const departureTime = ref("");
+const routeDepartureIso = ref("");
 const crowdToleranceValue = ref(2);
 const result = ref(null);
 const selectedRouteId = ref("");
@@ -145,12 +147,14 @@ async function loadRefuges() {
 
 function setStartLocation(location) {
   startLocation.value = location;
+  routeDepartureIso.value = "";
   result.value = null;
   selectedRouteId.value = "";
 }
 
 function setEndLocation(location) {
   endLocation.value = location;
+  routeDepartureIso.value = "";
   result.value = null;
   selectedRouteId.value = "";
 }
@@ -214,6 +218,8 @@ async function requestRoutes(options = {}) {
     const responseReceivedAt = performance.now();
 
     result.value = preserveCurrentRouteResult(result.value, body);
+    routeDepartureIso.value =
+      body.request_settings?.departure_time || routeDepartureIso.value;
     lastMonitorAlertSignature = "";
     alternativePreparedForSignature = "";
     monitorAlert.value = null;
@@ -264,7 +270,12 @@ async function fetchRouteCandidates(origin) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(
-      buildRouteRequest(origin, endLocation.value, crowdTolerance.value),
+      buildRouteRequest(
+        origin,
+        endLocation.value,
+        crowdTolerance.value,
+        selectRouteDeparture(departureTime.value, routeDepartureIso.value),
+      ),
     ),
   });
   const body = await response.json();
@@ -278,6 +289,7 @@ function swapLocations() {
   const previousStart = startLocation.value;
   startLocation.value = endLocation.value;
   endLocation.value = previousStart;
+  routeDepartureIso.value = "";
   result.value = null;
   selectedRouteId.value = "";
 }
@@ -672,7 +684,9 @@ function readPositionAccuracy(position) {
             <label for="departure-time">Departure time</label>
             <input id="departure-time" v-model="departureTime" type="datetime-local" />
           </div>
-          <p>Optional planning note. Route scores use the latest available data, not a future prediction.</p>
+          <p>
+            Optional. Historical outlook is shown only when imported baseline data is available.
+          </p>
         </div>
 
         <button class="primary-button" type="submit" :disabled="!canFindRoutes">
@@ -859,6 +873,34 @@ function readPositionAccuracy(position) {
         render {{ rerouteTiming.renderMilliseconds }} ms;
         total {{ rerouteTiming.totalMilliseconds }} ms.
       </p>
+
+      <section
+        v-if="selectedRoute?.prediction_alert"
+        class="prediction-alert"
+        role="alert"
+        data-testid="prediction-alert"
+      >
+        <span class="prediction-alert-icon" aria-hidden="true">◷</span>
+        <div>
+          <p class="screen-label">Historical outlook</p>
+          <h2>{{ selectedRoute.prediction_alert.message }}</h2>
+          <p>
+            {{ selectedRoute.prediction_alert.confidence }} confidence · based on an
+            imported historical baseline, not a live forecast.
+          </p>
+          <p v-if="!currentLocation">
+            Current Location is needed before CitySense can check another route.
+          </p>
+        </div>
+        <button
+          class="secondary-button"
+          type="button"
+          :disabled="rerouteLoading || !currentLocation"
+          @click="rerouteFromCurrentLocation('prediction')"
+        >
+          Check another route
+        </button>
+      </section>
 
       <section v-if="monitorAlert" class="monitor-alert" role="alert" data-testid="monitor-alert">
         <div>

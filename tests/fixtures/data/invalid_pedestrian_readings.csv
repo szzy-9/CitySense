@@ -1,0 +1,3 @@
+location_id,sensed_at,direction_1,direction_2,total_count,interval_minutes,source,fetched_at
+MISSING-SENSOR,not-a-time,-1,-1,-1,0,SYNTHETIC_TEST,2026-01-01T00:00:00
+MISSING-SENSOR,not-a-time,-1,-1,-1,0,SYNTHETIC_TEST,2026-01-01T00:00:00

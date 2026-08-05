@@ -1,0 +1,3 @@
+refuge_id,name,latitude,longitude,refuge_type,indoor_outdoor,has_seating,is_shaded,lighting_level,opening_hours,short_description,verified,data_source,last_checked_at
+SYNTH-REFUGE-001,Fictional Test Courtyard,-37.8128,144.9628,Courtyard,outdoor,true,true,daylight,Test availability only,Fictional quiet test fixture,false,SYNTHETIC_TEST,2026-01-01T00:00:00+00:00
+SYNTH-REFUGE-002,Fictional Test Library,-37.8142,144.9642,Indoor space,indoor,true,false,soft,Test availability only,Fictional indoor test fixture,false,SYNTHETIC_TEST,2026-01-01T00:00:00+00:00

@@ -56,6 +56,11 @@ FLASK_DEBUG=false
 PYTHONUNBUFFERED=1
 USE_LIVE_CITY_DATA=true
 REQUEST_TIMEOUT_SECONDS=8
+PREDICTION_MEDIUM_MIN_SAMPLES=12
+PREDICTION_HIGH_MIN_SAMPLES=30
+PREDICTION_MEDIUM_MAX_CV=1.0
+PREDICTION_HIGH_MAX_CV=0.5
+PREDICTION_MIN_ALERT_CONFIDENCE=MEDIUM
 ```
 
 Same-origin production normally uses:
@@ -91,6 +96,23 @@ Successful output:
 Database schema is ready.
 ```
 
+The Render filesystem is ephemeral. Do not copy persistent CSV data into the running filesystem. If approved production data must be loaded, run the version-controlled loader from a trusted workstation or one-off environment with `DATABASE_URL` set securely:
+
+```text
+python scripts/load_data.py --dry-run --strict
+python scripts/load_data.py --strict
+```
+
+For a staged first import, keep sensor foreign keys available before dependent profiles/readings:
+
+```text
+python scripts/load_data.py --sensor-locations data/processed/sensor_locations.csv --strict
+python scripts/load_data.py --historical-profiles data/processed/sensor_historical_profiles.csv --strict
+python scripts/load_data.py --refuges data/processed/refuges.csv --strict
+```
+
+Keep `data/raw/` and `data/processed/` files out of Git. Confirm loaded state through `/api/data/status`; the endpoint reveals counts only, not database details.
+
 ## 6. Health and smoke tests
 
 Replace the placeholder with the actual Render URL:
@@ -105,7 +127,13 @@ Expected connected response shape:
 {
   "status": "ok",
   "service": "CitySense API",
-  "database": { "status": "connected" }
+  "database": { "status": "connected" },
+  "data": {
+    "sensor_locations": { "loaded": false },
+    "pedestrian_readings": { "loaded": false },
+    "historical_profiles": { "loaded": false },
+    "refuges": { "loaded": false }
+  }
 }
 ```
 
@@ -119,6 +147,8 @@ Then manually verify:
 6. Current Location is requested only after a user action or entering Navigate.
 7. `/api/routes/monitor` does not request a new ORS route.
 8. Refreshing a non-API frontend path returns the SPA build.
+9. `/api/data/status` matches the datasets actually loaded into Neon.
+10. A missing historical profile displays `Historical prediction unavailable` rather than zero or Low.
 
 ## 7. Record the stable URL
 
@@ -135,4 +165,3 @@ Do not replace these fields without real evidence.
 ## Legacy AWS material
 
 `Procfile`, `application.py`, and local Elastic Beanstalk configuration remain for compatibility and historical work. They are not the active deployment target for this build and should not be deleted until the team confirms Render/Neon deployment.
-

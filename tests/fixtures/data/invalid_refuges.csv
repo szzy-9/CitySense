@@ -1,0 +1,3 @@
+refuge_id,name,latitude,longitude,refuge_type,indoor_outdoor,has_seating,is_shaded,lighting_level,opening_hours,short_description,verified,data_source,last_checked_at
+SYNTH-REFUGE-DUP,,95,200,,outdoor,maybe,perhaps,bright,Test,,invalid,SYNTHETIC_TEST,not-a-time
+SYNTH-REFUGE-DUP,Fictional duplicate,-37.81,144.96,Courtyard,outdoor,true,false,daylight,Test,Fictional duplicate,false,SYNTHETIC_TEST,2026-01-01T00:00:00+00:00

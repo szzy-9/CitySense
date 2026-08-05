@@ -27,6 +27,17 @@ Record real evidence beside each item before release. Do not mark manual items c
 - [ ] Prototype and fallback results are clearly labelled with a reason.
 - [ ] Above-threshold routes are not selected by default when a reliable below-threshold route exists.
 - [ ] Unavoidable and insufficient-data cases use their specific explanation.
+- [ ] Current observed load and historical outlook are visually and textually distinct.
+- [ ] Missing historical profiles display unavailable/NO_DATA, never zero or Low.
+- [ ] Predictive alerts appear only for 5–60 minute, above-threshold, sufficiently confident cases.
+
+## Data handoff and database
+
+- [ ] `validate_data.py --all` and `load_data.py --dry-run --strict` pass on approved non-empty files.
+- [ ] Count interval semantics, timezone, date range, method version, and attribution are documented by the data owner.
+- [ ] Repeated data loads are idempotent and a failed dataset transaction rolls back.
+- [ ] `/api/data/status` matches the database without exposing rows or credentials.
+- [ ] Live City refreshes remain in memory and are not written as historical observations.
 
 ## Navigation and accessibility
 
@@ -47,4 +58,3 @@ Record real evidence beside each item before release. Do not mark manual items c
 - [ ] Render health endpoint is tested over HTTPS.
 - [ ] Neon connection uses the pooled URL and `sslmode=require`.
 - [ ] Leaflet tiles, autocomplete, directions, pedestrian data, monitoring, reroute, and SPA refresh work on the deployed URL.
-

@@ -1,10 +1,10 @@
 import json
 import logging
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+from flask import has_app_context
 
 
 COUNTS_URL = (
@@ -68,12 +68,24 @@ def _read_live_data(timeout, client=None):
         count_response.raise_for_status()
         count_rows = count_response.json().get("results", [])
 
-        location_rows = _read_location_pages(http_client)
+        location_rows = _read_database_locations()
+        location_source = "DATABASE" if location_rows else "LIVE_API"
+        if not location_rows:
+            location_rows = _read_location_pages(http_client)
         snapshot = _join_live_rows(count_rows, location_rows)
+
+        # A populated database may be stale or use identifiers that do not match
+        # the live count feed. In that case, safely fall back to the live location
+        # catalogue instead of treating missing joins as quiet streets.
+        if not snapshot["sensors"] and location_source == "DATABASE":
+            location_rows = _read_location_pages(http_client)
+            location_source = "LIVE_API"
+            snapshot = _join_live_rows(count_rows, location_rows)
 
         if not snapshot["sensors"]:
             raise ValueError("The city datasets returned no matching sensors")
 
+        snapshot["sensor_location_source"] = location_source
         return snapshot
     finally:
         if owns_client:
@@ -101,6 +113,22 @@ def _read_location_pages(http_client):
     return rows
 
 
+def _read_database_locations():
+    if not has_app_context():
+        return []
+    from backend.repositories import list_active_sensor_locations
+
+    return [
+        {
+            "location_id": row["location_id"],
+            "sensor_description": row["sensor_name"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+        }
+        for row in list_active_sensor_locations()
+    ]
+
+
 def _join_live_rows(count_rows, location_rows):
     locations = {}
     for row in location_rows:
@@ -116,11 +144,22 @@ def _join_live_rows(count_rows, location_rows):
             }
 
     sensors = []
+    readings = []
     timestamps = []
     for row in count_rows:
         sensor_id = str(row.get("location_id") or row.get("sensor_id") or "")
         location = locations.get(sensor_id)
         if not location:
+            continue
+
+        raw_count = row.get("total_count")
+        if raw_count is None:
+            continue
+        try:
+            total_count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if total_count < 0:
             continue
 
         timestamp = row.get("sensing_datetime")
@@ -133,16 +172,30 @@ def _join_live_rows(count_rows, location_rows):
                 "name": location["name"],
                 "lat": location["lat"],
                 "lon": location["lon"],
-                "count": int(row.get("total_count") or 0),
+                "count": total_count,
+            }
+        )
+        readings.append(
+            {
+                "location_id": sensor_id,
+                "sensed_at": timestamp,
+                "total_count": total_count,
+                "interval_minutes": 60,
+                "source": "LIVE",
             }
         )
 
-    updated_at = max(timestamps) if timestamps else datetime.now(timezone.utc).isoformat()
+    updated_at = max(timestamps) if timestamps else None
     return {
         "source": "live",
         "updated_at": updated_at,
         "sensors": sensors,
+        "readings": readings,
         "message": "Live City of Melbourne pedestrian data",
+        "count_semantics": (
+            "Aggregated count from records returned by the City of Melbourne "
+            "past-hour per-minute dataset; completeness is not independently verified."
+        ),
     }
 
 
@@ -173,6 +226,9 @@ def _read_fallback_data():
         "source": "fallback",
         "updated_at": None,
         "sensors": data["sensors"],
+        "readings": [],
         "message": "Local sample data (no live timestamp)",
         "cache_status": "fallback",
+        "sensor_location_source": "FALLBACK",
+        "count_semantics": "Local prototype fallback counts.",
     }

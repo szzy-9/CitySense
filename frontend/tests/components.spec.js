@@ -86,6 +86,37 @@ describe("RouteCard sensory indicator", () => {
     expect(wrapper.text()).toContain("crowd avoidance not confirmed");
     expect(wrapper.text()).toContain("All available walking routes");
   });
+
+  it("shows an available historical prediction separately from current load", () => {
+    const wrapper = mount(RouteCard, {
+      props: {
+        route: route({
+          historical_prediction_available: true,
+          predicted_peak: "MODERATE",
+          predicted_count: 320,
+          prediction_confidence: "MEDIUM",
+          prediction_basis: "Historical median for the same weekday and hour",
+        }),
+        role: "Calmest",
+      },
+    });
+
+    const outlook = wrapper.get('[data-testid="historical-prediction"]');
+    expect(outlook.text()).toContain("Predicted peak: Moderate");
+    expect(outlook.text()).toContain("MEDIUM confidence");
+    expect(outlook.text()).toContain("◷");
+    expect(wrapper.text()).toContain("Current observed peak");
+  });
+
+  it("shows historical prediction unavailable without a zero value", () => {
+    const wrapper = mount(RouteCard, {
+      props: { route: route(), role: "Fastest" },
+    });
+
+    const outlook = wrapper.get('[data-testid="historical-prediction"]');
+    expect(outlook.text()).toContain("Historical prediction unavailable");
+    expect(outlook.text()).not.toContain("Predicted peak: Low");
+  });
 });
 
 describe("RefugeFinder", () => {

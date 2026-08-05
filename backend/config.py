@@ -84,3 +84,18 @@ class Config:
     REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "6"))
     PORT = int(os.getenv("PORT", "5000"))
     DEBUG = read_boolean("FLASK_DEBUG", False)
+    PREDICTION_MEDIUM_MIN_SAMPLES = int(
+        os.getenv("PREDICTION_MEDIUM_MIN_SAMPLES", "12")
+    )
+    PREDICTION_HIGH_MIN_SAMPLES = int(
+        os.getenv("PREDICTION_HIGH_MIN_SAMPLES", "30")
+    )
+    PREDICTION_MEDIUM_MAX_CV = float(
+        os.getenv("PREDICTION_MEDIUM_MAX_CV", "1.0")
+    )
+    PREDICTION_HIGH_MAX_CV = float(
+        os.getenv("PREDICTION_HIGH_MAX_CV", "0.5")
+    )
+    PREDICTION_MIN_ALERT_CONFIDENCE = os.getenv(
+        "PREDICTION_MIN_ALERT_CONFIDENCE", "MEDIUM"
+    ).upper()

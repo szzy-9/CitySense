@@ -64,6 +64,11 @@ const coverageText = computed(() => {
       Route geometry is a clearly marked prototype because the route service is unavailable.
     </p>
     <p>{{ coverageText }}</p>
+    <p>
+      Sensor locations: {{ dataStatus.sensor_location_source || "No data" }}.
+      Historical profiles: {{ dataStatus.historical_profile_source || "No data" }}.
+      Refuges: {{ dataStatus.refuge_source || "No data" }}.
+    </p>
     <p class="data-source-line">
       {{ route.matched_sensor_count }} nearby sensor{{
         route.matched_sensor_count === 1 ? "" : "s"

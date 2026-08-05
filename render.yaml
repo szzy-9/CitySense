@@ -22,3 +22,13 @@ services:
         value: "true"
       - key: REQUEST_TIMEOUT_SECONDS
         value: "8"
+      - key: PREDICTION_MEDIUM_MIN_SAMPLES
+        value: "12"
+      - key: PREDICTION_HIGH_MIN_SAMPLES
+        value: "30"
+      - key: PREDICTION_MEDIUM_MAX_CV
+        value: "1.0"
+      - key: PREDICTION_HIGH_MAX_CV
+        value: "0.5"
+      - key: PREDICTION_MIN_ALERT_CONFIDENCE
+        value: MEDIUM

@@ -27,10 +27,15 @@ Automated results must come from the test commands. Manual evidence remains requ
 | REF-03 | Refuge results render | User reads a card | Type, straight-line distance, attributes, and unverified disclaimer appear | Automated component | Manual content check |
 | DB-01 | `DATABASE_URL` is absent | App starts locally | SQLite is used | Automated configuration/local smoke | None beyond test log |
 | DB-02 | Neon URL is present | SQLAlchemy parses it | psycopg 3, SSL requirement, pre-ping, and small pool are configured | Automated | Real Neon connection evidence |
-| HEALTH-01 | Database is connected/degraded | `/api/health` is requested | Safe database status appears with no connection details | Automated connected path | Degraded deployment test |
+| HEALTH-01 | Database is connected/degraded | `/api/health` is requested | Safe database and loaded-data booleans appear with no connection details | Automated connected/degraded path | Degraded deployment test |
 | SEC-01 | Malicious/invalid input is submitted | Backend validation runs | Safe 4xx response; no SQL/stack/key/body is exposed | Automated focused cases | Release secret scan |
 | PRIV-01 | Browser location updates | Navigation runs | Precise position remains memory-only and is not logged/stored | Automated storage model check + code review | Runtime log/database inspection |
 | DEPLOY-01 | Render/Neon variables are configured | Docker service deploys | One service serves Vue, assets, API, SPA fallback, and health | Manual | Actual URL and deploy logs |
 | PERF-01 | Manual reroute is used on a real device | Request and render complete | Development timing is recorded locally without analytics/coordinates | Manual | Real-device timing |
-| PRED-01 | No verified historical baseline exists | Prediction is requested/considered | Prediction remains unavailable and no records are fabricated | Documentation/code review | Historical dataset decision |
-
+| DATA-01 | Fictional valid CSV fixtures exist | Validator and loader dry-run run | Headers, types, ranges, timestamps, duplicate keys, foreign keys, and non-zero rows pass | Automated | Real delivery validation log |
+| DATA-02 | A dataset has invalid or duplicate rows | Validation runs | Row-numbered errors appear and the command exits non-zero | Automated | Real error feedback record if needed |
+| DATA-03 | The same approved dataset is loaded twice | Upsert runs twice | No duplicate natural-key records are created | Automated SQLite | Neon idempotency smoke test |
+| PRED-01 | No matching historical profile exists | A route is scored | Exact unavailable/NO_DATA structure appears; no zero or fake value is used | Automated backend/component | Manual UI check |
+| PRED-02 | A matching synthetic profile exists | Segment ETA reaches its weekday/hour | Median count uses existing load bands and route predicted peak uses the worst segment | Automated | Real baseline acceptance evidence |
+| PRED-03 | Prediction exceeds tolerance in 5–60 minutes with enough confidence | Route is returned/navigated | Separate historical alert shows condition, lead time, confidence, and reroute option | Automated helper + component display | Manual timed browser evidence |
+| PRED-04 | A profile has low sample size/high variability or route is prototype | Prediction is evaluated | Confidence is LOW and no predictive alert is issued | Automated | Threshold calibration review |

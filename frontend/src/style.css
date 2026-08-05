@@ -11,6 +11,7 @@
   --color-low: #b8dec9;
   --color-low-text: #164b35;
   --color-moderate: #e5bd70;
+  --color-moderate-soft: #f7ead1;
   --color-moderate-text: #5b3b08;
   --color-high: #8e3f45;
   --color-high-soft: #f0d9dc;
@@ -460,6 +461,31 @@ footer {
   font-size: 0.88rem;
 }
 
+.historical-outlook {
+  margin: 4px 0 16px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-background);
+}
+
+.historical-outlook p {
+  margin: 0;
+}
+
+.historical-outlook p + p {
+  margin-top: 6px;
+}
+
+.prediction-value {
+  color: var(--color-dark-strong);
+  font-weight: 800;
+}
+
+.prediction-unavailable {
+  color: var(--color-muted);
+}
+
 .route-source {
   margin: 0;
   color: var(--color-muted);
@@ -803,7 +829,8 @@ footer {
   font-size: 0.78rem;
 }
 
-.monitor-alert {
+.monitor-alert,
+.prediction-alert {
   display: flex;
   margin: 18px 0;
   padding: 20px;
@@ -816,8 +843,28 @@ footer {
   background: var(--color-high-soft);
 }
 
+.prediction-alert-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.prediction-alert {
+  border-color: var(--color-moderate);
+  color: var(--color-dark-strong);
+  background: var(--color-moderate-soft);
+}
+
 .monitor-alert h2,
-.monitor-alert p {
+.monitor-alert p,
+.prediction-alert h2,
+.prediction-alert p {
   margin-top: 0;
 }
 

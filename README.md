@@ -28,11 +28,13 @@ The Plan screen also contains a separate **Find a Quiet Place** tool. It can lis
 - Fastest, Calmest, and crowd-threshold-based Recommended routes.
 - A visible LOW, HIGH, or NO_DATA route indicator.
 - Confidence labels and reasons based on route source, data freshness, sensors, and coverage.
+- Optional explainable historical median outlook when validated sensor profiles have been loaded; otherwise the UI states that prediction is unavailable.
 - Leaflet map with route segments, sensors, prototype refuges, current position, and location accuracy.
 - Follow Mode, Re-centre, arrival detection, off-route detection, and manual rerouting.
 - Periodic active-route crowd monitoring without requesting a new ORS route on every position update.
 - Prototype refuge finder and Overwhelm Mode.
 - SQLite for local development and Neon PostgreSQL support for production.
+- Validated CSV contracts, idempotent SQLite/PostgreSQL upserts, database-first sensor/refuge records, and safe data-status reporting.
 - Flask serves both the built Vue interface and API from one process.
 
 ## Data Meaning
@@ -123,13 +125,18 @@ Then open `http://127.0.0.1:5000`.
 | `PYTHONUNBUFFERED` | Production | Sends Python logs directly to Render logs. |
 | `VITE_API_BASE_URL` | Frontend development only | Local Flask URL. Production should be blank for same-origin `/api`. |
 | `VITE_ARRIVAL_DISTANCE_METERS` | No | Arrival radius. Default: 35 metres. |
+| `PREDICTION_MEDIUM_MIN_SAMPLES` | No | Prototype minimum samples for Medium prediction confidence. |
+| `PREDICTION_HIGH_MIN_SAMPLES` | No | Prototype minimum samples for High prediction confidence. |
+| `PREDICTION_MEDIUM_MAX_CV` | No | Prototype Medium-confidence variability limit. |
+| `PREDICTION_HIGH_MAX_CV` | No | Prototype High-confidence variability limit. |
+| `PREDICTION_MIN_ALERT_CONFIDENCE` | No | Minimum `MEDIUM` or `HIGH` confidence for a predictive alert; invalid/LOW values are safely treated as MEDIUM. |
 
 ## Testing
 
 Backend:
 
 ```powershell
-.\.venv\Scripts\python.exe -m compileall -q backend application.py scripts\init_db.py
+.\.venv\Scripts\python.exe -m compileall -q backend application.py scripts
 .\.venv\Scripts\python.exe -m pytest backend\tests -q
 ```
 
@@ -143,6 +150,18 @@ pnpm run build
 ```
 
 Live third-party calls are not part of CI. CI uses fake clients and fallback data.
+
+## Data Preparation
+
+No real historical CSV is committed. Header-only contracts are in `data/templates/`, ignored production paths are under `data/processed/`, and fictional tests are under `tests/fixtures/data/`.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_data.py --all
+.\.venv\Scripts\python.exe scripts\load_data.py --dry-run --strict
+.\.venv\Scripts\python.exe scripts\load_data.py --strict
+```
+
+See [data/README.md](data/README.md), [Data Dictionary](docs/DATA_DICTIONARY.md), [Data Pipeline](docs/DATA_PIPELINE.md), and [Data Science Handoff](docs/DS_DATA_HANDOFF.md).
 
 ## Deployment
 
@@ -159,7 +178,7 @@ See [docs/DEPLOY_RENDER_NEON.md](docs/DEPLOY_RENDER_NEON.md). The repository inc
 
 ## Known Limitations
 
-See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). Important limitations include incomplete sensor coverage, unverified refuge data, prototype fallbacks, Render free-tier cold starts, and no historical prediction when a real baseline dataset is unavailable.
+See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). Important limitations include incomplete sensor coverage, unverified refuge data, prototype fallbacks, Render free-tier cold starts, and unavailable historical prediction until validated baselines are loaded.
 
 ## Licence and Attribution
 
@@ -168,4 +187,3 @@ No software licence has been selected yet.
 - Map tiles and map attribution: OpenStreetMap contributors.
 - Route and autocomplete services: HeiGIT / openrouteservice / Pelias, subject to their service terms.
 - Pedestrian information: City of Melbourne open data, subject to the dataset attribution and licence terms.
-

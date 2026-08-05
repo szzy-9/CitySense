@@ -18,3 +18,5 @@ citysense.db
 backend/citysense.db
 .review
 sources
+data/raw
+data/processed

@@ -20,7 +20,9 @@ import {
   remainingRouteCoordinates,
   remainingRouteDistance,
   selectCurrentRouteStep,
+  selectRouteDeparture,
   shouldShowMonitorAlert,
+  toTimezoneAwareDeparture,
 } from "../src/routeDisplay.js";
 
 
@@ -176,13 +178,41 @@ test("reroute request preserves destination and crowd tolerance", () => {
     source: "autocomplete",
   };
 
-  const request = buildRouteRequest(origin, destination, "LOW");
+  const departure = "2026-08-06T00:30:00.000Z";
+  const request = buildRouteRequest(origin, destination, "LOW", departure);
 
   assert.deepEqual(request.start, origin);
   assert.deepEqual(request.end, destination);
   assert.equal(request.crowd_tolerance, "LOW");
+  assert.equal(request.departure_time, departure);
   assert.equal(canStartReroute(false), true);
   assert.equal(canStartReroute(true), false);
+});
+
+test("a datetime-local value is converted to a timezone-aware ISO timestamp", () => {
+  const departure = toTimezoneAwareDeparture("2026-08-06T09:30");
+
+  assert.match(departure, /^2026-08-\d{2}T\d{2}:30:00\.000Z$/);
+  assert.equal(toTimezoneAwareDeparture(""), null);
+});
+
+test("departure time remains part of a reroute request", () => {
+  const departure = "2026-08-06T00:30:00.000Z";
+  const reroute = buildRouteRequest(
+    location(144.966, -37.811),
+    { ...location(144.970, -37.810), label: "Destination" },
+    "MEDIUM",
+    departure,
+  );
+
+  assert.equal(reroute.start.source, "current_location");
+  assert.equal(reroute.departure_time, departure);
+});
+
+test("a backend-defaulted departure time is preserved for rerouting", () => {
+  const preserved = "2026-08-06T09:30:00+10:00";
+
+  assert.equal(selectRouteDeparture("", preserved), preserved);
 });
 
 test("reroute outcome clearly reports when no calmer route exists", () => {

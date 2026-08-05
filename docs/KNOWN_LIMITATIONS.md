@@ -12,7 +12,9 @@
 - NO_DATA never means LOW.
 - Sensor coverage is incomplete, and some route sections can have no nearby sensor.
 - Fallback pedestrian records are local samples without a live timestamp.
-- Historical prediction is unavailable because the repository does not contain a verified historical baseline dataset. No prediction records are fabricated.
+- Historical prediction remains unavailable until validated profile rows are loaded. The repository contains no real profile dataset and fabricates no prediction records.
+- When profiles are loaded, the baseline is an explainable weekday/hour median rather than a real-time forecasting model. Prototype confidence thresholds based on sample size and variability require empirical calibration.
+- Daylight-saving conversion and source interval semantics must be confirmed during the data-science handoff.
 
 ## Routing and navigation
 
@@ -42,5 +44,10 @@
 - A route or monitoring request necessarily sends the validated route coordinates to the Flask server for the immediate request. The application does not save those coordinates.
 - Route search metadata stores source categories and selected route IDs only.
 
-CitySense is decision support, not a guarantee of safety, accessibility, comfort, or service availability.
+## Data operations
 
+- The exact completeness and interval semantics of the City “past-hour counts per minute” aggregate cannot be proven by the current application query alone. Live refreshes are therefore not persisted as historical readings.
+- Database-first sensor locations and refuges are used only when their tables contain validated rows; otherwise explicit live API or prototype/fallback sources remain visible.
+- The schema initializer creates tables and adds current nullable route-search metadata columns, but future breaking schema changes will require a versioned migration tool.
+
+CitySense is decision support, not a guarantee of safety, accessibility, comfort, or service availability.

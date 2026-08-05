@@ -44,6 +44,13 @@ const distance = computed(() => {
 
 const coverage = computed(() => Math.round((props.route.coverage || 0) * 100));
 const indicator = computed(() => props.route.sensory_indicator || "NO_DATA");
+const prediction = computed(() => ({
+  available: Boolean(props.route.historical_prediction_available),
+  predictedPeak: props.route.predicted_peak || "NO_DATA",
+  confidence: props.route.prediction_confidence || "LOW",
+  basis: props.route.prediction_basis || "",
+  reason: props.route.prediction_unavailable_reason || "",
+}));
 const indicatorIcon = computed(() => {
   return { LOW: "✓", HIGH: "!", NO_DATA: "?" }[indicator.value] || "?";
 });
@@ -103,7 +110,7 @@ function levelClass(level) {
         <dd>{{ distance }}</dd>
       </div>
       <div>
-        <dt>Sensory level</dt>
+        <dt>Current observed peak</dt>
         <dd class="level-pill" :class="levelClass(route.sensory_level)">
           {{ formatLoadLevel(route.sensory_level) }}
         </dd>
@@ -129,6 +136,28 @@ function levelClass(level) {
     <p v-if="route.fallback_reason" class="fallback-warning">
       {{ route.fallback_reason }}
     </p>
+
+    <section
+      class="historical-outlook"
+      aria-label="Historical outlook"
+      data-testid="historical-prediction"
+    >
+      <p class="segment-title">Historical outlook</p>
+      <template v-if="prediction?.available">
+        <p class="prediction-value">
+          <span aria-hidden="true">◷</span>
+          Predicted peak: {{ formatLoadLevel(prediction.predictedPeak) }}
+        </p>
+        <p>
+          {{ prediction.confidence }} confidence · {{ prediction.basis }}.
+        </p>
+        <p v-if="prediction.reason">{{ prediction.reason }}</p>
+      </template>
+      <p v-else class="prediction-unavailable">
+        <span aria-hidden="true">?</span> Historical prediction unavailable.
+      </p>
+      <p v-if="!prediction.available && prediction.reason">{{ prediction.reason }}</p>
+    </section>
 
     <div v-if="route.segments?.length" class="segment-section">
       <p class="segment-title">Load by segment</p>

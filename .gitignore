@@ -15,6 +15,10 @@ frontend/dist/
 .review/
 sources/
 AGENTS.md
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 .elasticbeanstalk/*
 !.elasticbeanstalk/config.yml
 

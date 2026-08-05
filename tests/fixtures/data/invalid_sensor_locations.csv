@@ -1,0 +1,3 @@
+location_id,sensor_name,latitude,longitude,location_type,status,data_source,updated_at
+SYNTH-DUP,Fictional invalid latitude,-98,144.96,Intersection,active,SYNTHETIC_TEST,not-a-time
+SYNTH-DUP,Fictional duplicate,-37.81,190,Footpath,active,SYNTHETIC_TEST,2026-01-01T00:00:00
