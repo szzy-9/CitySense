@@ -1,0 +1,14 @@
+.env
+.git/
+.github/
+.pnpm-store/
+.pytest_cache/
+.review/
+.venv/
+**/__pycache__/
+*.db
+*.pyc
+AGENTS.md
+docs/
+frontend/node_modules/
+sources/
