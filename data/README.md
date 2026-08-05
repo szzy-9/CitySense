@@ -31,4 +31,4 @@ Load approved files with dataset-level transactions and idempotent upserts:
 .\.venv\Scripts\python.exe scripts\load_data.py --strict
 ```
 
-See `docs/DATA_DICTIONARY.md`, `docs/DATA_PIPELINE.md`, and `docs/DS_DATA_HANDOFF.md` before preparing or loading data.
+See `docs/DATA_DICTIONARY.md` and `docs/DATA_PIPELINE.md` before preparing or loading data.
