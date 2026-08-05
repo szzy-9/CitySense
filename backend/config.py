@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -39,20 +39,43 @@ def read_database_url():
         return f"sqlite:///{default_path}"
 
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    parsed_url = make_url(url)
+    if parsed_url.get_backend_name() == "postgresql":
+        query = dict(parsed_url.query)
+        query.setdefault("sslmode", "require")
+        parsed_url = parsed_url.set(query=query)
+    return parsed_url
 
-    return url
+
+def read_engine_options(database_url):
+    parsed_url = make_url(database_url)
+    if parsed_url.get_backend_name() == "sqlite":
+        return {"pool_pre_ping": True}
+    return {
+        "pool_pre_ping": True,
+        "pool_size": 3,
+        "max_overflow": 2,
+        "pool_recycle": 300,
+    }
 
 
 class Config:
     SQLALCHEMY_DATABASE_URI = read_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    MAX_CONTENT_LENGTH = 16 * 1024
+    SQLALCHEMY_ENGINE_OPTIONS = read_engine_options(SQLALCHEMY_DATABASE_URI)
+    MAX_CONTENT_LENGTH = 64 * 1024
 
-    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    FRONTEND_ORIGIN = os.getenv(
+        "ALLOWED_ORIGINS",
+        os.getenv(
+            "FRONTEND_ORIGIN",
+            "http://127.0.0.1:5173,http://localhost:5173",
+        ),
+    )
     ORS_API_KEY = (
         os.getenv("OPENROUTESERVICE_API_KEY", "").strip()
         or os.getenv("ORS_API_KEY", "").strip()

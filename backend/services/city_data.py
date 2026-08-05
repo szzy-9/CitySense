@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,12 +17,24 @@ LOCATIONS_URL = (
 )
 FALLBACK_FILE = Path(__file__).resolve().parents[1] / "data" / "pedestrian_fallback.json"
 logger = logging.getLogger(__name__)
+LIVE_CACHE_SECONDS = 60
+_live_cache = {"snapshot": None, "stored_at": 0.0}
 
 
 def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
     if use_live:
+        if client is None and _cache_is_current():
+            snapshot = dict(_live_cache["snapshot"])
+            snapshot["message"] = "Cached live City of Melbourne pedestrian data"
+            snapshot["cache_status"] = "cached"
+            return snapshot
         try:
-            return _read_live_data(timeout, client)
+            snapshot = _read_live_data(timeout, client)
+            snapshot["cache_status"] = "live"
+            if client is None:
+                _live_cache["snapshot"] = snapshot
+                _live_cache["stored_at"] = time.monotonic()
+            return snapshot
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             logger.warning(
                 "City pedestrian data is unavailable; using fallback data (%s)",
@@ -29,6 +42,13 @@ def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
             )
 
     return _read_fallback_data()
+
+
+def _cache_is_current():
+    return (
+        _live_cache["snapshot"] is not None
+        and time.monotonic() - _live_cache["stored_at"] <= LIVE_CACHE_SECONDS
+    )
 
 
 def _read_live_data(timeout, client=None):
@@ -154,4 +174,5 @@ def _read_fallback_data():
         "updated_at": None,
         "sensors": data["sensors"],
         "message": "Local sample data (no live timestamp)",
+        "cache_status": "fallback",
     }

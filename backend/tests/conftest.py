@@ -12,7 +12,9 @@ def app():
             "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
             "USE_LIVE_CITY_DATA": False,
             "ORS_API_KEY": "",
-            "FRONTEND_ORIGIN": "http://localhost:5173",
+            "FRONTEND_ORIGIN": (
+                "http://127.0.0.1:5173,http://localhost:5173"
+            ),
         }
     )
 
@@ -26,4 +28,3 @@ def app():
 @pytest.fixture()
 def client(app):
     return app.test_client()
-

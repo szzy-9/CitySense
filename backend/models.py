@@ -10,8 +10,9 @@ class RouteSearch(db.Model):
     __tablename__ = "route_searches"
 
     id = db.Column(db.Integer, primary_key=True)
-    start_id = db.Column(db.String(80), nullable=False)
-    end_id = db.Column(db.String(80), nullable=False)
+    # Legacy database column names are retained so existing local databases work.
+    start_source = db.Column("start_id", db.String(80), nullable=False)
+    end_source = db.Column("end_id", db.String(80), nullable=False)
     fastest_route_id = db.Column(db.String(40), nullable=False)
     calmest_route_id = db.Column(db.String(40), nullable=False)
     route_source = db.Column(db.String(20), nullable=False)
@@ -21,4 +22,3 @@ class RouteSearch(db.Model):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
-

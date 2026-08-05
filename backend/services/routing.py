@@ -1,27 +1,59 @@
-import math
 import logging
+import math
 
 import httpx
 
 
-ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
+ORS_URL = (
+    "https://api.heigit.org/openrouteservice/v2/directions/"
+    "foot-walking/geojson"
+)
 logger = logging.getLogger(__name__)
 
 
 def get_walking_routes(start, end, api_key, timeout=6, client=None):
+    fallback_reason = (
+        "Live routing is not configured. Prototype routes are shown."
+    )
+
     if api_key:
         try:
             routes = _request_live_routes(start, end, api_key, timeout, client)
             if len(routes) >= 2:
                 return routes[:2], "live", "OpenRouteService walking routes"
-        except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
-            logger.warning(
-                "OpenRouteService is unavailable; using simulated routes (%s)",
-                type(error).__name__,
+            fallback_reason = (
+                "The route service did not return enough usable alternatives. "
+                "Prototype routes are shown."
             )
+            logger.warning("OpenRouteService fallback category=insufficient_routes")
+        except httpx.TimeoutException:
+            fallback_reason = (
+                "The live route request timed out. Prototype routes are shown."
+            )
+            logger.warning("OpenRouteService fallback category=timeout")
+        except httpx.HTTPStatusError as error:
+            status_code = error.response.status_code
+            if status_code in {401, 403}:
+                fallback_reason = (
+                    "Live routing authentication failed. Prototype routes are shown."
+                )
+                category = "authentication"
+            else:
+                fallback_reason = (
+                    "The live route service is temporarily unavailable. "
+                    "Prototype routes are shown."
+                )
+                category = "http_status"
+            logger.warning("OpenRouteService fallback category=%s", category)
+        except (httpx.HTTPError, KeyError, TypeError, ValueError):
+            fallback_reason = (
+                "The live route service returned an unusable response. "
+                "Prototype routes are shown."
+            )
+            logger.warning("OpenRouteService fallback category=invalid_response")
 
-    routes = _build_fallback_routes(start, end)
-    return routes, "fallback", "Two locally simulated walking routes"
+    routes = _build_fallback_routes(start, end, fallback_reason)
+    return routes, "fallback", fallback_reason
 
 
 def _request_live_routes(start, end, api_key, timeout, client=None):
@@ -32,7 +64,7 @@ def _request_live_routes(start, end, api_key, timeout, client=None):
             [start["lon"], start["lat"]],
             [end["lon"], end["lat"]],
         ],
-        "instructions": False,
+        "instructions": True,
         "alternative_routes": {
             "target_count": 2,
             "weight_factor": 1.6,
@@ -47,32 +79,55 @@ def _request_live_routes(start, end, api_key, timeout, client=None):
             json=payload,
         )
         response.raise_for_status()
-        features = response.json().get("features", [])
+        body = response.json()
+        if not isinstance(body, dict):
+            raise ValueError("Invalid route response")
+        features = body.get("features", [])
+        if not isinstance(features, list):
+            raise ValueError("Invalid route features")
     finally:
         if owns_client:
             http_client.close()
 
     routes = []
     for index, feature in enumerate(features):
-        summary = feature.get("properties", {}).get("summary", {})
+        if not isinstance(feature, dict):
+            continue
+        properties = feature.get("properties", {})
+        summary = properties.get("summary", {})
         geometry = feature.get("geometry", {})
 
-        if geometry.get("type") != "LineString":
+        coordinates = geometry.get("coordinates")
+        if (
+            geometry.get("type") != "LineString"
+            or not isinstance(coordinates, list)
+            or len(coordinates) < 2
+        ):
+            continue
+
+        distance = float(summary["distance"])
+        duration = float(summary["duration"])
+        if not math.isfinite(distance) or not math.isfinite(duration):
+            continue
+        if distance <= 0 or duration <= 0:
             continue
 
         routes.append(
             {
                 "id": f"route-{index + 1}",
                 "geometry": geometry,
-                "distance_meters": round(float(summary["distance"])),
-                "duration_minutes": round(float(summary["duration"]) / 60, 1),
+                "distance_meters": round(distance),
+                "duration_minutes": round(duration / 60, 1),
+                "steps": _read_steps(properties, coordinates),
+                "source": "LIVE",
+                "fallback_reason": None,
             }
         )
 
     return routes
 
 
-def _build_fallback_routes(start, end):
+def _build_fallback_routes(start, end, fallback_reason):
     start_point = [start["lon"], start["lat"]]
     end_point = [end["lon"], end["lat"]]
     lon_change = end["lon"] - start["lon"]
@@ -103,16 +158,76 @@ def _build_fallback_routes(start, end):
             "geometry": {"type": "LineString", "coordinates": fastest_coordinates},
             "distance_meters": round(fastest_distance),
             "duration_minutes": round(fastest_distance / 80, 1),
-            "simulated_crowd_score": 540,
+            "steps": [],
+            "source": "PROTOTYPE",
+            "fallback_reason": fallback_reason,
         },
         {
             "id": "route-2",
             "geometry": {"type": "LineString", "coordinates": calm_coordinates},
             "distance_meters": round(calm_distance),
             "duration_minutes": round(calm_distance / 76, 1),
-            "simulated_crowd_score": 165,
+            "steps": [],
+            "source": "PROTOTYPE",
+            "fallback_reason": fallback_reason,
         },
     ]
+
+
+def _read_steps(properties, coordinates):
+    direction_segments = properties.get("segments", [])
+    if not isinstance(direction_segments, list):
+        return []
+
+    steps = []
+    for direction_segment in direction_segments:
+        if not isinstance(direction_segment, dict):
+            continue
+        for step in direction_segment.get("steps", []):
+            normalized = _read_step(step, coordinates)
+            if normalized:
+                normalized["index"] = len(steps)
+                steps.append(normalized)
+    return steps
+
+
+def _read_step(step, coordinates):
+    if not isinstance(step, dict):
+        return None
+
+    instruction = step.get("instruction")
+    way_points = step.get("way_points")
+    if (
+        not isinstance(instruction, str)
+        or not instruction.strip()
+        or not isinstance(way_points, list)
+        or len(way_points) != 2
+    ):
+        return None
+
+    try:
+        start_index = int(way_points[0])
+        end_index = int(way_points[1])
+        distance = float(step.get("distance", 0))
+        duration = float(step.get("duration", 0))
+    except (TypeError, ValueError):
+        return None
+
+    if (
+        start_index < 0
+        or end_index < start_index
+        or end_index >= len(coordinates)
+        or not math.isfinite(distance)
+        or not math.isfinite(duration)
+    ):
+        return None
+
+    return {
+        "instruction": " ".join(instruction.split())[:240],
+        "distance_meters": round(max(0, distance)),
+        "duration_seconds": round(max(0, duration)),
+        "way_points": [start_index, end_index],
+    }
 
 
 def _between(start, end, amount):

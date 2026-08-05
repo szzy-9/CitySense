@@ -1,5 +1,7 @@
 # CitySense AWS Connection and Deployment Plan
 
+> **Legacy / deferred deployment option.** Render Web Service with Neon PostgreSQL is the active target for the current onboarding build. Keep this AWS plan for reference only; it is not evidence of an AWS deployment.
+
 ## Status and scope
 
 CitySense is **partially configured but not proven deployed**. The repository has the local files needed for a basic Elastic Beanstalk deployment, but it has no AWS account details, resource identifiers, deployment URL, or verified RDS connection.
