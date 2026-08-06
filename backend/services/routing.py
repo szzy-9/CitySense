@@ -11,45 +11,33 @@ ORS_URL = (
 logger = logging.getLogger(__name__)
 
 
+# Why live routing failed matters in the logs, not on screen: every cause means
+# the same thing to the person walking, and naming our internals ("authentication
+# failed") tells them nothing they can act on.
+FALLBACK_REASON = (
+    "Live routing is unavailable, so these are example routes rather than real ones."
+)
+
+
 def get_walking_routes(start, end, api_key, timeout=6, client=None):
-    fallback_reason = (
-        "Live routing is not configured. Prototype routes are shown."
-    )
+    fallback_reason = FALLBACK_REASON
 
     if api_key:
         try:
             routes = _request_live_routes(start, end, api_key, timeout, client)
             if len(routes) >= 2:
                 return routes[:2], "live", "OpenRouteService walking routes"
-            fallback_reason = (
-                "The route service did not return enough usable alternatives. "
-                "Prototype routes are shown."
-            )
             logger.warning("OpenRouteService fallback category=insufficient_routes")
         except httpx.TimeoutException:
-            fallback_reason = (
-                "The live route request timed out. Prototype routes are shown."
-            )
             logger.warning("OpenRouteService fallback category=timeout")
         except httpx.HTTPStatusError as error:
-            status_code = error.response.status_code
-            if status_code in {401, 403}:
-                fallback_reason = (
-                    "Live routing authentication failed. Prototype routes are shown."
-                )
-                category = "authentication"
-            else:
-                fallback_reason = (
-                    "The live route service is temporarily unavailable. "
-                    "Prototype routes are shown."
-                )
-                category = "http_status"
+            category = (
+                "authentication"
+                if error.response.status_code in {401, 403}
+                else "http_status"
+            )
             logger.warning("OpenRouteService fallback category=%s", category)
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
-            fallback_reason = (
-                "The live route service returned an unusable response. "
-                "Prototype routes are shown."
-            )
             logger.warning("OpenRouteService fallback category=invalid_response")
 
     routes = _build_fallback_routes(start, end, fallback_reason)

@@ -1,6 +1,8 @@
 .env
+.env.local
 backend/.env
 frontend/.env
+frontend/.env.local
 .venv/
 backend/.venv/
 __pycache__/
@@ -26,3 +28,8 @@ data/processed/*
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+
+# Requirement files
+*.pptx
+*.docx
+*.pdf

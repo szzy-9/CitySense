@@ -25,7 +25,12 @@ ROUTE_UNAVAILABLE = {
     "predicted_count": None,
     "prediction_confidence": "LOW",
     "prediction_basis": None,
-    "prediction_unavailable_reason": "Historical profile data has not been loaded.",
+    # Stated from the reader's side: we have no past pattern for these sensors at
+    # this time of day. Naming an internal load step here has misreported the
+    # cause before, because a populated table can still miss this weekday/hour.
+    "prediction_unavailable_reason": (
+        "We have no past pattern for this route at this time of day."
+    ),
     "prediction_alert": None,
 }
 
@@ -148,7 +153,7 @@ def _segment_prediction(segment, arrival_time, lead_minutes, lookup, thresholds)
             "profile_sensor_count": 0,
             "prediction_lead_minutes": lead_minutes,
             "prediction_unavailable_reason": (
-                "No matching historical profile for this segment."
+                "No past pattern for this stretch at this time of day."
             ),
         }
 
@@ -174,7 +179,7 @@ def _segment_prediction(segment, arrival_time, lead_minutes, lookup, thresholds)
         "predicted_band": predicted_band,
         "predicted_count": round(peak_item["count"]),
         "prediction_confidence": confidence,
-        "prediction_basis": "Historical median for the same weekday and hour",
+        "prediction_basis": "Based on the same weekday and hour in past weeks",
         "predicted_for": arrival_time.isoformat(),
         "profile_sensor_count": len(profiles),
         "prediction_sample_count": peak_item["sample_count"],
@@ -221,13 +226,13 @@ def _summarise_route(route, crowd_tolerance, thresholds):
         "predicted_peak": predicted_peak,
         "predicted_count": peak_prediction["predicted_count"],
         "prediction_confidence": "LOW" if limited_coverage else confidence,
-        "prediction_basis": "Historical median for the same weekday and hour",
+        "prediction_basis": "Based on the same weekday and hour in past weeks",
         "prediction_coverage": round(prediction_coverage, 2),
         "prediction_unavailable_reason": (
-            "Historical profiles cover only part of this route."
+            "We only have past patterns for part of this route."
             if limited_coverage
             else
-            "Prototype route geometry limits prediction confidence."
+            "This is an example route, so the outlook is less certain."
             if route.get("route_source") != "live"
             else None
         ),
@@ -262,8 +267,8 @@ def _summarise_route(route, crowd_tolerance, thresholds):
         "lead_minutes": round(first["prediction_lead_minutes"]),
         "confidence": first["prediction_confidence"],
         "message": (
-            f"Historical patterns suggest {first['predicted_band'].title()} crowd "
-            f"levels in about {round(first['prediction_lead_minutes'])} minutes."
+            f"Likely {first['predicted_band'].lower()} in about "
+            f"{round(first['prediction_lead_minutes'])} minutes, based on past weeks."
         ),
         "reroute_available": True,
     }

@@ -184,7 +184,7 @@ function addRefugeMarker(refuge) {
     fillColor: readColor("--color-refuge", "#dce8ff"),
     fillOpacity: 1,
   })
-    .bindTooltip(createTextElement(`Prototype refuge: ${refuge.name}`))
+    .bindTooltip(createTextElement(`Quiet place: ${refuge.name}`))
     .addTo(routeGroup);
 }
 
@@ -312,7 +312,7 @@ function createTextElement(text) {
       ref="mapElement"
       class="map"
       role="region"
-      aria-label="Map showing route load, current position, pedestrian sensors, and prototype refuges"
+      aria-label="Map showing how busy the route is, your position, pedestrian sensors, and quiet places"
     ></div>
     <button
       v-if="currentLocation && !following"

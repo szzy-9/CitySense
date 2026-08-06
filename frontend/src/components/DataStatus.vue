@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 
-import { formatDataStatus } from "../routeDisplay.js";
+import { formatDataStatus, formatSourceLabel } from "../routeDisplay.js";
 
 
 const props = defineProps({
@@ -18,12 +18,12 @@ const props = defineProps({
 const updatedText = computed(() => {
   const value = props.route?.last_updated || props.dataStatus?.updated_at;
   if (!value) {
-    return "No live update time is available.";
+    return "We do not have a live update time for this data.";
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "The latest update time could not be read.";
+    return "We could not read the time of the latest update.";
   }
 
   const formatted = new Intl.DateTimeFormat("en-AU", {
@@ -31,7 +31,7 @@ const updatedText = computed(() => {
     timeStyle: "short",
     timeZone: "Australia/Melbourne",
   }).format(date);
-  return `Latest pedestrian data updated at ${formatted}.`;
+  return `Crowd counts last updated ${formatted}.`;
 });
 
 const coverageText = computed(() => {
@@ -39,35 +39,35 @@ const coverageText = computed(() => {
     return "";
   }
   if (props.route.sensory_level === "NO_DATA") {
-    return "No reliable crowd data for this route.";
+    return "No sensors are reporting along this route right now.";
   }
   if (props.route.coverage < 1) {
-    return "Sensor coverage is limited for part of this route.";
+    return "Part of this route has no sensors nearby, so it is not checked.";
   }
-  return "All displayed route segments have nearby sensor data.";
+  return "Every part of this route has a sensor nearby.";
 });
 </script>
 
 <template>
   <section v-if="route && dataStatus" class="data-status-card" aria-labelledby="data-status-title">
     <div class="status-title-row">
-      <h2 id="data-status-title">Data status</h2>
+      <h2 id="data-status-title">Where this comes from</h2>
       <span class="status-chip" :class="`status-${route.data_status.toLowerCase()}`">
         {{ formatDataStatus(route.data_status) }}
       </span>
     </div>
     <p>{{ updatedText }}</p>
     <p v-if="dataStatus.pedestrian_source === 'fallback'">
-      Using local sample pedestrian data. It has no live timestamp.
+      These are sample crowd counts, not today's. Treat them as a preview.
     </p>
     <p v-if="dataStatus.route_source === 'fallback'">
-      Route geometry is a clearly marked prototype because the route service is unavailable.
+      Live routing is unavailable, so these are example routes rather than real ones.
     </p>
     <p>{{ coverageText }}</p>
     <p>
-      Sensor locations: {{ dataStatus.sensor_location_source || "No data" }}.
-      Historical profiles: {{ dataStatus.historical_profile_source || "No data" }}.
-      Refuges: {{ dataStatus.refuge_source || "No data" }}.
+      Sensor locations: {{ formatSourceLabel(dataStatus.sensor_location_source) }}.
+      Past patterns: {{ formatSourceLabel(dataStatus.historical_profile_source) }}.
+      Quiet spaces: {{ formatSourceLabel(dataStatus.refuge_source) }}.
     </p>
     <p class="data-source-line">
       {{ route.matched_sensor_count }} nearby sensor{{

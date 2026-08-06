@@ -132,7 +132,7 @@ def create_app(test_config=None):
             return _error(str(error), 400)
 
         if not app.config["ORS_API_KEY"]:
-            return _error("The HeiGIT API key is not configured.", 503)
+            return _error("Address search is unavailable right now.", 503)
 
         try:
             results = autocomplete_locations(
@@ -196,9 +196,9 @@ def create_app(test_config=None):
                         else False
                     ),
                     "message": (
-                        "Database refuge information. Check local conditions."
+                        "Check the place when you arrive; conditions change."
                         if refuge_source == "DATABASE"
-                        else "Prototype refuge information. Check local conditions."
+                        else "We picked these places ourselves. Check them when you arrive."
                     ),
                 },
             }

@@ -10,7 +10,7 @@ defineProps({
   },
   statusMessage: {
     type: String,
-    default: "Prototype refuge information. Check local conditions.",
+    default: "We picked this place ourselves. Check it when you arrive.",
   },
 });
 
@@ -40,7 +40,7 @@ defineEmits(["exit"]);
       </template>
 
       <p v-else class="prototype-warning">
-        Refuge information is unavailable. Check your surroundings and local signs.
+        We cannot find a quiet place right now. Look around you for somewhere to pause.
       </p>
 
       <button class="exit-button" type="button" aria-label="Exit Overwhelm Mode" @click="$emit('exit')">

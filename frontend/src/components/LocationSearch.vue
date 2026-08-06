@@ -1,6 +1,11 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from "vue";
 
+import { UserFacingError, messageForError } from "../userMessages.js";
+
+
+const SEARCH_UNAVAILABLE_MESSAGE =
+  "Address search is unavailable right now. Please try again shortly.";
 
 const props = defineProps({
   fieldId: {
@@ -74,17 +79,18 @@ async function search(text) {
     );
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.error || "Address search is unavailable.");
+      throw new UserFacingError(body.error || SEARCH_UNAVAILABLE_MESSAGE);
     }
 
     results.value = body.results || [];
     searchMessage.value = results.value.length
       ? "Select one result to confirm this location."
-      : "No matching address was found in the supported area.";
+      : "We could not find that address in central Melbourne.";
   } catch (error) {
-    if (error.name !== "AbortError") {
-      searchMessage.value = error.message || "Address search is unavailable.";
+    if (error.name === "AbortError") {
+      return;
     }
+    searchMessage.value = messageForError(error, SEARCH_UNAVAILABLE_MESSAGE);
   } finally {
     loading.value = false;
   }

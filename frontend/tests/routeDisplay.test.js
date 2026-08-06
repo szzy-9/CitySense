@@ -24,6 +24,26 @@ import {
   shouldShowMonitorAlert,
   toTimezoneAwareDeparture,
 } from "../src/routeDisplay.js";
+import { UserFacingError, messageForError } from "../src/userMessages.js";
+
+
+test("raw network exceptions never reach the user", () => {
+  // A failed fetch throws exactly this, and it used to be shown on screen.
+  const networkFailure = new TypeError("Failed to fetch");
+  const shown = messageForError(networkFailure, "Please try again shortly.");
+
+  assert.equal(shown, "Please try again shortly.");
+  assert.doesNotMatch(shown, /Failed to fetch/);
+});
+
+test("messages written for people are shown as they were written", () => {
+  const written = new UserFacingError("We could not find that address.");
+
+  assert.equal(
+    messageForError(written, "Please try again shortly."),
+    "We could not find that address.",
+  );
+});
 
 
 test("No Data is displayed explicitly and never formatted as Low", () => {
@@ -32,7 +52,7 @@ test("No Data is displayed explicitly and never formatted as Low", () => {
 });
 
 test("prototype routes are labelled clearly", () => {
-  assert.equal(formatDataStatus("PROTOTYPE"), "Prototype route");
+  assert.equal(formatDataStatus("PROTOTYPE"), "Example route");
 });
 
 test("calmest comparison reports limited segment coverage", () => {
@@ -41,7 +61,7 @@ test("calmest comparison reports limited segment coverage", () => {
 
   assert.equal(
     buildCalmestComparison(fastest, calmest),
-    "3 minutes longer. Observed peak is Moderate; coverage is limited.",
+    "3 minutes longer. Reaches Moderate at its busiest, and part of it has no sensors.",
   );
 });
 
@@ -51,7 +71,7 @@ test("calmest comparison does not claim calm conditions without data", () => {
 
   assert.equal(
     buildCalmestComparison(fastest, calmest),
-    "Crowd data is insufficient for a reliable calmest comparison.",
+    "We do not have enough crowd data to compare these routes.",
   );
 });
 
@@ -218,7 +238,7 @@ test("a backend-defaulted departure time is preserved for rerouting", () => {
 test("reroute outcome clearly reports when no calmer route exists", () => {
   assert.equal(
     compareObservedPeaks({ peak_load: "HIGH" }, { peak_load: "HIGH" }),
-    "No lower-load alternative was found. The lowest observed option is shown.",
+    "Nothing calmer nearby. This is the calmest option we found.",
   );
 });
 

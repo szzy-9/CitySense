@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import {
+  formatConfidence,
   formatDataStatus,
   formatLoadLevel,
   formatSensoryIndicator,
@@ -44,6 +45,13 @@ const distance = computed(() => {
 
 const coverage = computed(() => Math.round((props.route.coverage || 0) * 100));
 const indicator = computed(() => props.route.sensory_indicator || "NO_DATA");
+// The headline note already states the first reason, so listing it again just
+// repeats the same sentence twice in a row.
+const additionalConfidenceReasons = computed(() =>
+  (props.route.confidence_reasons || []).filter(
+    (reason) => reason !== props.route.confidence_explanation,
+  ),
+);
 const prediction = computed(() => ({
   available: Boolean(props.route.historical_prediction_available),
   predictedPeak: props.route.predicted_peak || "NO_DATA",
@@ -92,8 +100,8 @@ function levelClass(level) {
     <p v-if="route.recommended" class="recommended-badge" data-testid="recommended-route">
       {{
         route.congestion_avoidable
-          ? "Recommended for your selected crowd limit"
-          : "Lowest observed option; crowd avoidance not confirmed"
+          ? "Our pick for your crowd limit"
+          : "Our pick, though we cannot promise it stays calm"
       }}
     </p>
     <p
@@ -110,28 +118,28 @@ function levelClass(level) {
         <dd>{{ distance }}</dd>
       </div>
       <div>
-        <dt>Current observed peak</dt>
+        <dt>Busiest point</dt>
         <dd class="level-pill" :class="levelClass(route.sensory_level)">
           {{ formatLoadLevel(route.sensory_level) }}
         </dd>
       </div>
       <div>
-        <dt>Confidence</dt>
+        <dt>How sure we are</dt>
         <dd>{{ route.confidence === "HIGH" ? "High" : "Low" }}</dd>
       </div>
       <div>
-        <dt>Coverage</dt>
+        <dt>Route checked</dt>
         <dd>{{ coverage }}%</dd>
       </div>
     </dl>
 
     <p v-if="route.peak_location" class="route-explanation">
-      Peak location: {{ route.peak_location }}
+      Busiest near {{ route.peak_location }}
     </p>
     <p class="route-explanation">{{ route.explanation }}</p>
     <p class="confidence-note">{{ route.confidence_explanation }}</p>
-    <ul v-if="route.confidence_reasons?.length > 1" class="confidence-reasons">
-      <li v-for="reason in route.confidence_reasons" :key="reason">{{ reason }}</li>
+    <ul v-if="additionalConfidenceReasons.length" class="confidence-reasons">
+      <li v-for="reason in additionalConfidenceReasons" :key="reason">{{ reason }}</li>
     </ul>
     <p v-if="route.fallback_reason" class="fallback-warning">
       {{ route.fallback_reason }}
@@ -139,31 +147,32 @@ function levelClass(level) {
 
     <section
       class="historical-outlook"
-      aria-label="Historical outlook"
+      aria-label="What to expect"
       data-testid="historical-prediction"
     >
-      <p class="segment-title">Historical outlook</p>
+      <p class="segment-title">What to expect</p>
       <template v-if="prediction?.available">
         <p class="prediction-value">
           <span aria-hidden="true">◷</span>
-          Predicted peak: {{ formatLoadLevel(prediction.predictedPeak) }}
+          Likely {{ formatLoadLevel(prediction.predictedPeak).toLowerCase() }}
+          when you get there
         </p>
         <p>
-          {{ prediction.confidence }} confidence · {{ prediction.basis }}.
+          {{ formatConfidence(prediction.confidence) }} · {{ prediction.basis }}.
         </p>
         <p v-if="prediction.reason">{{ prediction.reason }}</p>
       </template>
       <p v-else class="prediction-unavailable">
-        <span aria-hidden="true">?</span> Historical prediction unavailable.
+        <span aria-hidden="true">?</span> We cannot say how busy this will be.
       </p>
       <p v-if="!prediction.available && prediction.reason">{{ prediction.reason }}</p>
     </section>
 
     <div v-if="route.segments?.length" class="segment-section">
-      <p class="segment-title">Load by segment</p>
+      <p class="segment-title">How busy, step by step</p>
       <RouteLoadBar :segments="route.segments" />
     </div>
-    <p v-else class="no-segments">No segment data is available.</p>
+    <p v-else class="no-segments">We have no crowd data for this route.</p>
 
     <p v-if="comparisonText" class="comparison-note">{{ comparisonText }}</p>
 
