@@ -13,9 +13,18 @@ const INDICATOR_LABELS = {
 
 const DATA_STATUS_LABELS = {
   LIVE: "Live data",
-  FALLBACK: "Fallback data",
-  PROTOTYPE: "Prototype route",
+  FALLBACK: "Sample data",
+  PROTOTYPE: "Example route",
   NO_DATA: "No data",
+};
+
+// Internal source enums must never reach the screen as raw values.
+const SOURCE_LABELS = {
+  DATABASE: "imported",
+  LIVE_API: "live from the city",
+  FALLBACK: "sample data",
+  CURATED_PROTOTYPE: "our own shortlist",
+  NO_DATA: "none yet",
 };
 
 const LOAD_RANK = {
@@ -36,17 +45,31 @@ export function formatDataStatus(status) {
   return DATA_STATUS_LABELS[status] || "No data";
 }
 
+export function formatSourceLabel(source) {
+  return SOURCE_LABELS[source] || SOURCE_LABELS.NO_DATA;
+}
+
+const CONFIDENCE_LABELS = {
+  HIGH: "We are confident",
+  MEDIUM: "Fairly confident",
+  LOW: "Less confident",
+};
+
+export function formatConfidence(confidence) {
+  return CONFIDENCE_LABELS[confidence] || CONFIDENCE_LABELS.LOW;
+}
+
 export function buildCalmestComparison(fastest, calmest) {
   if (!fastest || !calmest) {
     return "";
   }
 
   if (fastest.id === calmest.id) {
-    return "This route is both fastest and calmest for the available data.";
+    return "This route is both the fastest and the calmest we can find.";
   }
 
   if (calmest.sensory_level === "NO_DATA") {
-    return "Crowd data is insufficient for a reliable calmest comparison.";
+    return "We do not have enough crowd data to compare these routes.";
   }
 
   const difference = Math.max(
@@ -61,10 +84,10 @@ export function buildCalmestComparison(fastest, calmest) {
   const level = formatLoadLevel(calmest.sensory_level);
 
   if (hasMissingData) {
-    return `${timeText}. Observed peak is ${level}; coverage is limited.`;
+    return `${timeText}. Reaches ${level} at its busiest, and part of it has no sensors.`;
   }
 
-  return `${timeText}, but no observed segment is above ${level}.`;
+  return `${timeText}, and nothing along it goes above ${level}.`;
 }
 
 export function isConfirmedLocation(location) {
@@ -236,12 +259,12 @@ export function compareObservedPeaks(previousRoute, nextRoute) {
   const previousRank = LOAD_RANK[previousRoute?.peak_load] || Infinity;
   const nextRank = LOAD_RANK[nextRoute?.peak_load] || Infinity;
   if (!Number.isFinite(nextRank)) {
-    return "The alternative has insufficient crowd data for comparison.";
+    return "We cannot check crowds on that alternative right now.";
   }
   if (!Number.isFinite(previousRank) || nextRank < previousRank) {
-    return "A lower-load alternative is available.";
+    return "There is a calmer way to go.";
   }
-  return "No lower-load alternative was found. The lowest observed option is shown.";
+  return "Nothing calmer nearby. This is the calmest option we found.";
 }
 
 export function monitorAlertSignature(response) {

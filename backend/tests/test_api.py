@@ -121,7 +121,10 @@ def test_autocomplete_requires_a_backend_api_key(client):
     )
 
     assert response.status_code == 503
-    assert "configured" in response.get_json()["error"]
+    # Say the feature is unavailable without naming our provider or its keys.
+    error = response.get_json()["error"]
+    assert "unavailable" in error
+    assert "key" not in error.lower()
 
 
 def test_refuges_accept_a_validated_coordinate_origin(client):
@@ -192,7 +195,7 @@ def test_fallback_returns_two_scored_routes_for_coordinates(client):
         assert route["prediction_confidence"] == "LOW"
         assert route["prediction_alert"] is None
         assert route["prediction_unavailable_reason"] == (
-            "Historical profile data has not been loaded."
+            "We have no past pattern for this route at this time of day."
         )
 
     assert "Fastest" in roles

@@ -103,7 +103,7 @@ def select_recommended_route(routes):
         return (
             select_calmest_route(within_threshold),
             True,
-            "Recommended because its observed peak is within your selected crowd limit.",
+            "Its busiest point still sits within your crowd limit.",
         )
 
     observed_above_threshold = [
@@ -114,20 +114,20 @@ def select_recommended_route(routes):
     if observed_above_threshold:
         if len(observed_above_threshold) == len(routes):
             reason = (
-                "All available walking routes contain at least one segment above "
-                "your selected crowd limit. This route has the lowest observed peak."
+                "Every route today goes above your crowd limit somewhere. "
+                "This one stays the calmest at its busiest point."
             )
         else:
             reason = (
-                "No below-threshold route could be confirmed because some route data "
-                "is unavailable. This route has the lowest observed peak."
+                "Some routes are missing crowd data, so we cannot promise a calmer "
+                "one. This is the calmest we can confirm."
             )
         return select_calmest_route(observed_above_threshold), False, reason
 
     return (
         select_calmest_route(routes),
         False,
-        "Crowd data is insufficient to confirm that congestion can be avoided.",
+        "There is not enough crowd data right now to promise a calmer route.",
     )
 
 
@@ -162,10 +162,10 @@ def calculate_confidence(
     if reasons:
         return "LOW", reasons[0]
 
+    sensor_word = "sensor" if sensor_count == 1 else "sensors"
     return (
         "HIGH",
-        f"Live data from {sensor_count} nearby sensors with "
-        f"{round(coverage * 100)}% coverage.",
+        f"Based on live counts from {sensor_count} {sensor_word} along this route.",
     )
 
 
@@ -180,17 +180,17 @@ def confidence_reasons(
 ):
     reasons = []
     if route_source != "live":
-        reasons.append("Prototype route; confidence is low.")
+        reasons.append("This is an example route, not a live one.")
     if pedestrian_source != "live":
-        reasons.append("Pedestrian data is fallback data.")
+        reasons.append("Showing sample crowd counts, not today's.")
     if sensory_level == NO_DATA:
-        reasons.append("No reliable crowd data near this route.")
+        reasons.append("No sensors are reporting near this route.")
     if not _is_fresh(updated_at, now):
-        reasons.append("Pedestrian data may be out of date.")
+        reasons.append("The latest crowd counts are over an hour old.")
     if sensor_count < MIN_HIGH_CONFIDENCE_SENSORS:
-        reasons.append("Too few nearby sensors for high confidence.")
+        reasons.append("Only a few sensors sit along this route.")
     if coverage < MIN_HIGH_CONFIDENCE_COVERAGE:
-        reasons.append("Limited sensor coverage.")
+        reasons.append("Parts of this route have no sensors nearby.")
     return reasons
 
 
@@ -346,7 +346,7 @@ def monitor_route(
             "breached": False,
             "upcoming_peak": NO_DATA,
             "affected_segment_index": None,
-            "message": "Recent reliable crowd monitoring data is unavailable.",
+            "message": "We cannot check crowds ahead right now.",
         }
 
     segments = _build_route_segments(
@@ -368,12 +368,13 @@ def monitor_route(
 
     if breached:
         message = (
-            f"{_level_label(upcoming_peak)} crowd levels were detected ahead."
+            f"It gets {_level_label(upcoming_peak).lower()} ahead. "
+            "You can switch to a calmer route."
         )
     elif upcoming_peak == NO_DATA:
-        message = "No reliable crowd data is available for the route ahead."
+        message = "No sensors are reporting on the road ahead."
     else:
-        message = "No crowd level above your selected limit was detected ahead."
+        message = "The road ahead stays within your crowd limit."
 
     return {
         "breached": breached,
@@ -387,12 +388,10 @@ def _recommendation_reason(route, recommended, recommended_reason):
     if route["id"] == recommended["id"]:
         return recommended_reason
     if route["sensory_indicator"] == HIGH:
-        return "Not recommended for your selected crowd threshold."
+        return "This route goes above your crowd limit."
     if route["sensory_indicator"] == NO_DATA:
-        return (
-            "Not recommended by default because reliable crowd coverage is insufficient."
-        )
-    return "Another route has a lower observed peak or stronger data coverage."
+        return "We cannot check this route for crowds right now."
+    return "Another route stays calmer at its busiest point."
 
 
 def _build_route_segments(coordinates, sensors):
@@ -497,19 +496,19 @@ def _route_data_status(route_source, pedestrian_source, sensory_level):
 
 def _route_explanation(sensory_level, peak_location, segments):
     if sensory_level == NO_DATA:
-        return "No reliable crowd data for this route."
+        return "No sensors are reporting along this route right now."
 
     level = _level_label(sensory_level)
     if peak_location:
-        return f"Peaks at {level} near {peak_location}."
+        return f"Busiest near {peak_location}, where it reaches {level}."
 
     has_no_data = any(
         segment["sensory_level"] == NO_DATA
         for segment in segments
     )
     if has_no_data:
-        return f"Observed peak is {level}; part of the route has no data."
-    return f"No observed segment is above {level}."
+        return f"Reaches {level} at its busiest. Part of the route has no sensors."
+    return f"Nothing along this route goes above {level}."
 
 
 def _level_label(level):

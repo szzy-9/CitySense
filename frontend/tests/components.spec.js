@@ -83,8 +83,26 @@ describe("RouteCard sensory indicator", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("crowd avoidance not confirmed");
+    expect(wrapper.text()).toContain("we cannot promise it stays calm");
     expect(wrapper.text()).toContain("All available walking routes");
+  });
+
+  it("does not print the headline confidence reason twice", () => {
+    const explanation = "This is an example route, not a live one.";
+    const wrapper = mount(RouteCard, {
+      props: {
+        route: route({
+          confidence: "LOW",
+          confidence_explanation: explanation,
+          confidence_reasons: [explanation, "Showing sample crowd counts, not today's."],
+        }),
+        role: "Calmest",
+      },
+    });
+
+    const occurrences = wrapper.text().split(explanation).length - 1;
+    expect(occurrences).toBe(1);
+    expect(wrapper.text()).toContain("Showing sample crowd counts");
   });
 
   it("shows an available historical prediction separately from current load", () => {
@@ -102,10 +120,10 @@ describe("RouteCard sensory indicator", () => {
     });
 
     const outlook = wrapper.get('[data-testid="historical-prediction"]');
-    expect(outlook.text()).toContain("Predicted peak: Moderate");
-    expect(outlook.text()).toContain("MEDIUM confidence");
+    expect(outlook.text()).toContain("Likely moderate");
+    expect(outlook.text()).toContain("Fairly confident");
     expect(outlook.text()).toContain("◷");
-    expect(wrapper.text()).toContain("Current observed peak");
+    expect(wrapper.text()).toContain("Busiest point");
   });
 
   it("shows historical prediction unavailable without a zero value", () => {
@@ -114,8 +132,9 @@ describe("RouteCard sensory indicator", () => {
     });
 
     const outlook = wrapper.get('[data-testid="historical-prediction"]');
-    expect(outlook.text()).toContain("Historical prediction unavailable");
-    expect(outlook.text()).not.toContain("Predicted peak: Low");
+    expect(outlook.text()).toContain("We cannot say how busy this will be");
+    // A missing prediction must never render as a real "Low" reading.
+    expect(outlook.text()).not.toContain("Likely low");
   });
 });
 

@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from "vue";
 
+import { UserFacingError, messageForError } from "../userMessages.js";
+
 
 const props = defineProps({
   apiBaseUrl: {
@@ -72,12 +74,19 @@ async function loadRefuges(origin) {
     );
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.error || "Quiet-place information is unavailable.");
+      throw new UserFacingError(
+        body.error || "We cannot look up quiet places right now.",
+      );
     }
     refuges.value = body.refuges || [];
-    message.value = body.data_status?.message || "Prototype refuge information. Check local conditions.";
+    message.value =
+      body.data_status?.message ||
+      "We picked these places ourselves. Check them when you arrive.";
   } catch (error) {
-    message.value = error.message || "Quiet-place information is unavailable.";
+    message.value = messageForError(
+      error,
+      "We cannot look up quiet places right now. Please try again shortly.",
+    );
   } finally {
     loading.value = false;
   }
@@ -103,9 +112,9 @@ function formatDistance(metres) {
   <section class="refuge-finder surface-card" aria-labelledby="refuge-finder-title">
     <div v-if="!open" class="refuge-finder-entry">
       <div>
-        <p class="screen-label">Quiet-place prototype</p>
+        <p class="screen-label">Quiet places</p>
         <h2 id="refuge-finder-title">Need a nearby place to pause?</h2>
-        <p>Find several prototype refuge locations without planning a route.</p>
+        <p>See quiet spots close by, without planning a whole route.</p>
       </div>
       <button type="button" class="secondary-button" data-testid="open-refuge-finder" @click="openFinder">
         Find a Quiet Place
@@ -116,7 +125,7 @@ function formatDistance(metres) {
       <div class="refuge-finder-heading">
         <div>
           <p class="screen-label">Quiet places</p>
-          <h2 id="refuge-finder-title">Nearby prototype refuges</h2>
+          <h2 id="refuge-finder-title">Quiet places nearby</h2>
         </div>
         <button type="button" class="text-button" @click="closeFinder">Close</button>
       </div>
@@ -146,7 +155,7 @@ function formatDistance(metres) {
           <p class="refuge-distance-small">{{ formatDistance(refuge.distance_meters) }}</p>
           <p>{{ refuge.short_description }}</p>
           <p class="refuge-availability">{{ refuge.availability }}</p>
-          <p class="verification-note">Prototype information · Not officially verified</p>
+          <p class="verification-note">Chosen by us · Not officially verified</p>
         </article>
       </div>
     </div>

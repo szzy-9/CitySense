@@ -80,7 +80,7 @@ def test_high_confidence_requires_live_fresh_well_covered_data():
     )
 
     assert confidence == "HIGH"
-    assert "4 nearby sensors" in explanation
+    assert "4 sensors" in explanation
 
 
 def test_prototype_route_always_has_low_confidence_and_no_data_indicator():
@@ -103,7 +103,8 @@ def test_prototype_route_always_has_low_confidence_and_no_data_indicator():
     )
 
     assert confidence == "LOW"
-    assert "Prototype route" in explanation
+    # An example route must say so rather than implying it is live.
+    assert "example route" in explanation
     assert indicator == NO_DATA
 
 
@@ -149,8 +150,10 @@ def test_all_candidates_above_threshold_returns_unavoidable_explanation():
 
     assert recommended["id"] == "high-b"
     assert avoidable is False
-    assert "All available walking routes" in reason
-    assert "lowest observed peak" in reason
+    # When every option breaches the limit, say so instead of implying a safe pick,
+    # while still explaining why this one was chosen.
+    assert "Every route" in reason
+    assert "calmest at its busiest point" in reason
 
 
 def test_all_candidates_no_data_never_claims_congestion_was_avoided():
@@ -162,7 +165,8 @@ def test_all_candidates_no_data_never_claims_congestion_was_avoided():
     _, avoidable, reason = select_recommended_route(routes)
 
     assert avoidable is False
-    assert "insufficient" in reason
+    # The reason must not promise a calmer route when nothing was observed.
+    assert "not enough crowd data" in reason
 
 
 def test_observed_high_is_preferred_to_unknown_route_without_false_claim():
@@ -175,7 +179,8 @@ def test_observed_high_is_preferred_to_unknown_route_without_false_claim():
 
     assert recommended["id"] == "observed"
     assert avoidable is False
-    assert "could be confirmed" in reason
+    # Missing data must be named, not silently presented as a calm result.
+    assert "missing crowd data" in reason
 
 
 def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():

@@ -1,6 +1,8 @@
+import logging
+
 import httpx
 
-from backend.services.routing import ORS_URL, get_walking_routes
+from backend.services.routing import FALLBACK_REASON, ORS_URL, get_walking_routes
 
 
 START = {"label": "Start", "lat": -37.818, "lon": 144.969}
@@ -77,56 +79,65 @@ def test_missing_key_returns_explicit_prototype_routes():
     )
 
     assert source == "fallback"
-    assert "not configured" in message
+    # Routes must be labelled as examples rather than passed off as real ones.
+    assert message == FALLBACK_REASON
+    assert "example routes" in message
     assert all(route["source"] == "PROTOTYPE" for route in routes)
     assert all(route["fallback_reason"] == message for route in routes)
     assert all(route["steps"] == [] for route in routes)
 
 
-def test_authentication_failure_returns_safe_labelled_fallback():
+def test_authentication_failure_returns_safe_labelled_fallback(caplog):
     client = FakeClient(response=FakeResponse(status_code=401))
 
-    routes, source, message = get_walking_routes(
-        START,
-        END,
-        api_key="invalid-test-key",
-        client=client,
-    )
+    with caplog.at_level(logging.WARNING):
+        routes, source, message = get_walking_routes(
+            START,
+            END,
+            api_key="invalid-test-key",
+            client=client,
+        )
 
     assert source == "fallback"
-    assert "authentication failed" in message
+    # The cause belongs in the logs; the key itself must never reach the user.
+    assert "category=authentication" in caplog.text
     assert "invalid-test-key" not in message
+    assert "authentication" not in message.lower()
     assert all(route["source"] == "PROTOTYPE" for route in routes)
 
 
-def test_timeout_returns_safe_labelled_fallback():
+def test_timeout_returns_safe_labelled_fallback(caplog):
     request = httpx.Request("POST", ORS_URL)
     client = FakeClient(error=httpx.ReadTimeout("timed out", request=request))
 
-    routes, source, message = get_walking_routes(
-        START,
-        END,
-        api_key="test-key",
-        client=client,
-    )
+    with caplog.at_level(logging.WARNING):
+        routes, source, message = get_walking_routes(
+            START,
+            END,
+            api_key="test-key",
+            client=client,
+        )
 
     assert source == "fallback"
-    assert "timed out" in message
+    assert "category=timeout" in caplog.text
+    assert message == FALLBACK_REASON
     assert all(route["fallback_reason"] == message for route in routes)
 
 
-def test_invalid_external_response_returns_safe_labelled_fallback():
+def test_invalid_external_response_returns_safe_labelled_fallback(caplog):
     client = FakeClient(response=FakeResponse(body={"features": "invalid"}))
 
-    routes, source, message = get_walking_routes(
-        START,
-        END,
-        api_key="test-key",
-        client=client,
-    )
+    with caplog.at_level(logging.WARNING):
+        routes, source, message = get_walking_routes(
+            START,
+            END,
+            api_key="test-key",
+            client=client,
+        )
 
     assert source == "fallback"
-    assert "unusable response" in message
+    assert "category=invalid_response" in caplog.text
+    assert message == FALLBACK_REASON
     assert len(routes) == 2
     assert all(route["source"] == "PROTOTYPE" for route in routes)
 

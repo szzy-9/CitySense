@@ -22,6 +22,7 @@ import {
   shouldShowMonitorAlert,
   selectRouteDeparture,
 } from "./routeDisplay.js";
+import { UserFacingError, messageForError } from "./userMessages.js";
 
 
 const API_BASE_URL =
@@ -251,9 +252,12 @@ async function requestRoutes(options = {}) {
     return body;
   } catch (error) {
     result.value = preserveCurrentRouteResult(result.value, null);
-    errorMessage.value = error.message || "Something went wrong. Please try again.";
+    errorMessage.value = messageForError(
+      error,
+      "We could not reach CitySense just now. Please try again shortly.",
+    );
     if (isReroute) {
-      rerouteMessage.value = "Reroute failed. Your current route is still shown.";
+      rerouteMessage.value = "We could not find another route. Your current one still stands.";
     }
     return null;
   } finally {
@@ -280,7 +284,7 @@ async function fetchRouteCandidates(origin) {
   });
   const body = await response.json();
   if (!response.ok) {
-    throw new Error(body.error || "Could not find routes.");
+    throw new UserFacingError(body.error || "We could not find a route just now.");
   }
   return body;
 }
@@ -357,7 +361,9 @@ async function enterOverwhelmMode() {
     );
     const body = await response.json();
     if (!response.ok || !body.nearest_refuge) {
-      throw new Error(body.error || "Refuge information is unavailable.");
+      throw new UserFacingError(
+        body.error || "We cannot find a quiet place right now.",
+      );
     }
 
     refugeResponse.value = body;
@@ -365,7 +371,10 @@ async function enterOverwhelmMode() {
     previousScreen.value = currentScreen.value;
     changeScreen("overwhelm");
   } catch (error) {
-    errorMessage.value = error.message || "Refuge information is unavailable.";
+    errorMessage.value = messageForError(
+      error,
+      "We cannot find a quiet place right now. Look around you for somewhere to pause.",
+    );
   } finally {
     refugeLoading.value = false;
   }
@@ -477,7 +486,9 @@ async function monitorActiveRoute() {
     });
     const body = await response.json();
     if (!response.ok) {
-      throw new Error(body.error || "Route monitoring is unavailable.");
+      throw new UserFacingError(
+        body.error || "We cannot check crowds ahead right now.",
+      );
     }
 
     if (!body.breached) {
@@ -685,7 +696,7 @@ function readPositionAccuracy(position) {
             <input id="departure-time" v-model="departureTime" type="datetime-local" />
           </div>
           <p>
-            Optional. Historical outlook is shown only when imported baseline data is available.
+            Optional. Tell us when you are leaving and we will show how busy it is likely to be.
           </p>
         </div>
 
@@ -722,8 +733,8 @@ function readPositionAccuracy(position) {
         </div>
 
         <div v-else class="empty-state surface-card">
-          <p>Type an address, then select a result to confirm it.</p>
-          <p>Typed text alone is not used as a route location.</p>
+          <p>Type an address, then pick it from the list.</p>
+          <p>We use the place you pick, not the words you type.</p>
         </div>
       </section>
 
@@ -731,7 +742,7 @@ function readPositionAccuracy(position) {
         <div>
           <p class="screen-label">Route preference</p>
           <h2 id="tolerance-title">Crowd tolerance: {{ crowdToleranceLabel }}</h2>
-          <p>This sets the maximum observed load used for the default recommendation.</p>
+          <p>How busy a street can get before we route you around it.</p>
         </div>
         <div class="slider-wrap">
           <input
@@ -825,7 +836,7 @@ function readPositionAccuracy(position) {
           <p v-else-if="navigation?.step">
             Distance updates when Current Location is available.
           </p>
-          <p v-else>Turn-by-turn steps are unavailable for this prototype route.</p>
+          <p v-else>Step-by-step directions are not available for an example route.</p>
           <dl class="navigation-facts">
             <div>
               <dt>Remaining distance</dt>
@@ -978,7 +989,10 @@ function readPositionAccuracy(position) {
     </main>
 
     <footer>
-      <p>CitySense prototype. Position updates do not automatically recalculate routes.</p>
+      <p>
+        CitySense is an early version. As you move, your route stays as planned
+        until you ask for a new one.
+      </p>
     </footer>
   </div>
 </template>
