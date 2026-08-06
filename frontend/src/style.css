@@ -17,7 +17,9 @@
   --color-high-soft: #f0d9dc;
   --color-border: #b9cbc8;
   --color-text: #173c3a;
-  --color-muted: #526966;
+  /* Darkened from #526966, which fell to 4.39:1 on the tinted route cards.
+     This clears WCAG AA (4.5:1) on every surface it is used on. */
+  --color-muted: #465957;
   --color-no-data: #89989a;
   --color-no-data-soft: #e2e7e7;
   --color-refuge: #dce8ff;
@@ -538,25 +540,45 @@ footer {
   border-radius: 999px;
 }
 
-.level-low,
+/* The strong fills belong to the small pills and segment bars only. The same
+   level class is also set on the whole route card, and painting a card in a
+   solid level colour left its body text at roughly 1.2:1 contrast. Cards get
+   the soft tint below instead. */
+.level-pill.level-low,
 .load-low {
   color: var(--color-low-text);
   background: var(--color-low);
 }
 
-.level-moderate,
+.level-pill.level-moderate,
 .load-moderate {
   color: var(--color-moderate-text);
   background: var(--color-moderate);
 }
 
-.level-high,
+.level-pill.level-high,
 .load-high {
   color: var(--color-surface);
   background: var(--color-high);
 }
 
-.level-no-data,
+.route-card.level-low {
+  background: color-mix(in srgb, var(--color-low) 22%, var(--color-surface));
+}
+
+.route-card.level-moderate {
+  background: var(--color-moderate-soft);
+}
+
+.route-card.level-high {
+  background: var(--color-high-soft);
+}
+
+.route-card.level-no-data {
+  background: var(--color-no-data-soft);
+}
+
+.level-pill.level-no-data,
 .load-no-data {
   color: #293c3d;
   background: var(--color-no-data-soft);
