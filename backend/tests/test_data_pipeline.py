@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -5,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import create_engine, inspect, text
 
 from backend.app import create_app
-from backend.models import SensorLocation, db
+from backend.models import PedestrianReading, SensorLocation, db
 from scripts import load_data
 from scripts.load_data import load_datasets
 from scripts.validate_data import validate_dataset, validate_files
@@ -122,6 +123,44 @@ def test_loader_is_idempotent_with_synthetic_files(app):
         assert SensorLocation.query.count() == 2
 
 
+def test_loader_handles_more_rows_than_sqlite_bind_variable_limit(app, tmp_path):
+    """A real extract exceeds SQLite's bind-variable cap in a single INSERT."""
+    sensors = tmp_path / "sensor_locations.csv"
+    sensors.write_text(
+        "location_id,sensor_name,latitude,longitude,location_type,status,"
+        "data_source,updated_at\n"
+        "SYNTH-BULK,Fictional bulk sensor,-37.81,144.96,pedestrian_counter,"
+        "active,SYNTHETIC_TEST,2026-01-01T00:00:00+00:00\n",
+        encoding="utf-8",
+    )
+
+    # Eight columns per row, so this clears SQLite's 32766-variable ceiling for
+    # a single multi-row INSERT and fails unless the loader chunks.
+    row_count = 4200
+    lines = [
+        "location_id,sensed_at,direction_1,direction_2,total_count,"
+        "interval_minutes,source,fetched_at"
+    ]
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for index in range(row_count):
+        sensed_at = (base + timedelta(hours=index)).isoformat()
+        lines.append(
+            f"SYNTH-BULK,{sensed_at},1,2,3,60,"
+            "SYNTHETIC_TEST,2026-01-01T00:00:00+00:00"
+        )
+    readings = tmp_path / "pedestrian_readings.csv"
+    readings.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    loaded = load_datasets(
+        {"sensor_locations": sensors, "pedestrian_readings": readings},
+        app=app,
+    )
+
+    assert loaded["pedestrian_readings"] == row_count
+    with app.app_context():
+        assert PedestrianReading.query.count() == row_count
+
+
 def test_loader_dry_run_does_not_write(app):
     files = {"sensor_locations": FIXTURES / "sensor_locations.csv"}
 
@@ -135,7 +174,19 @@ def test_loader_dry_run_does_not_write(app):
 def test_missing_optional_files_are_reported_and_strict_mode_fails(
     monkeypatch,
     capsys,
+    tmp_path,
 ):
+    # Point the standard paths at an empty directory so the result does not
+    # depend on whether this developer machine has real processed extracts.
+    monkeypatch.setattr(
+        load_data,
+        "DEFAULT_FILES",
+        {
+            dataset: tmp_path / path.name
+            for dataset, path in load_data.DEFAULT_FILES.items()
+        },
+    )
+
     monkeypatch.setattr("sys.argv", ["load_data.py", "--dry-run"])
     assert load_data.main() == 1
     assert "Skipped missing optional dataset" in capsys.readouterr().out

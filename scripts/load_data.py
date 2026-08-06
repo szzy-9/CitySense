@@ -51,6 +51,19 @@ LOAD_ORDER = [
     "refuges",
 ]
 
+# SQLite allows a limited number of bind variables per statement (999 before
+# 3.32, 32766 after). A single multi-row INSERT of a real extract exceeds that,
+# so rows are sent in chunks sized to stay under the lower limit regardless of
+# how many columns the dataset has.
+SQLITE_MAX_BIND_VARIABLES = 900
+POSTGRES_CHUNK_ROWS = 5000
+
+
+def _chunk_size(dialect_name, column_count):
+    if dialect_name == "sqlite":
+        return max(1, SQLITE_MAX_BIND_VARIABLES // max(column_count, 1))
+    return POSTGRES_CHUNK_ROWS
+
 
 def upsert_rows(dataset, rows):
     """Upsert one already-validated dataset in the caller's transaction."""
@@ -60,23 +73,26 @@ def upsert_rows(dataset, rows):
     table = MODELS[dataset].__table__
     dialect_name = db.engine.dialect.name
     if dialect_name == "postgresql":
-        statement = postgresql_insert(table).values(rows)
+        insert_for_dialect = postgresql_insert
     elif dialect_name == "sqlite":
-        statement = sqlite_insert(table).values(rows)
+        insert_for_dialect = sqlite_insert
     else:
         raise RuntimeError(f"Unsupported database dialect: {dialect_name}")
 
-    update_values = {
-        column.name: getattr(statement.excluded, column.name)
-        for column in table.columns
-        if column.name not in CONFLICT_KEYS[dataset]
-        and not (column.primary_key and column.autoincrement)
-    }
-    statement = statement.on_conflict_do_update(
-        index_elements=CONFLICT_KEYS[dataset],
-        set_=update_values,
-    )
-    db.session.execute(statement)
+    chunk_size = _chunk_size(dialect_name, len(rows[0]))
+    for start in range(0, len(rows), chunk_size):
+        statement = insert_for_dialect(table).values(rows[start : start + chunk_size])
+        update_values = {
+            column.name: getattr(statement.excluded, column.name)
+            for column in table.columns
+            if column.name not in CONFLICT_KEYS[dataset]
+            and not (column.primary_key and column.autoincrement)
+        }
+        statement = statement.on_conflict_do_update(
+            index_elements=CONFLICT_KEYS[dataset],
+            set_=update_values,
+        )
+        db.session.execute(statement)
 
 
 def load_datasets(files, dry_run=False, app=None):
