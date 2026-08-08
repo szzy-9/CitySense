@@ -2,12 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#12171c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f6f8" media="(prefers-color-scheme: light)" />
     <meta
       name="description"
       content="Compare faster and calmer walking routes through Melbourne."
     />
     <title>CitySense - calmer walks through Melbourne</title>
+    <!--
+      Dark is the default, so the page is painted dark before the stylesheet
+      arrives. Without this the first frame is a white flash, which is exactly
+      the thing this app exists to spare its users.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #12171c;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

@@ -2,12 +2,14 @@
 import { computed } from "vue";
 
 import {
+  describeUnavoidablePeak,
   formatConfidence,
   formatDataStatus,
   formatLoadLevel,
   formatSensoryIndicator,
 } from "../routeDisplay.js";
-import RouteLoadBar from "./RouteLoadBar.vue";
+import BandIcon from "./BandIcon.vue";
+import PeakStrip from "./PeakStrip.vue";
 
 
 const props = defineProps({
@@ -44,7 +46,9 @@ const distance = computed(() => {
 });
 
 const coverage = computed(() => Math.round((props.route.coverage || 0) * 100));
+const unavoidableNote = computed(() => describeUnavoidablePeak(props.route));
 const indicator = computed(() => props.route.sensory_indicator || "NO_DATA");
+const peakLevel = computed(() => props.route.sensory_level || "NO_DATA");
 // The headline note already states the first reason, so listing it again just
 // repeats the same sentence twice in a row.
 const additionalConfidenceReasons = computed(() =>
@@ -62,65 +66,49 @@ const prediction = computed(() => ({
 const indicatorIcon = computed(() => {
   return { LOW: "✓", HIGH: "!", NO_DATA: "?" }[indicator.value] || "?";
 });
+const indicatorWord = computed(() => {
+  return { LOW: "Low", HIGH: "High" }[indicator.value] || "No Data";
+});
 
 function levelClass(level) {
-  return "level-" + String(level || "NO_DATA").toLowerCase().replace("_", "-");
+  return "band-" + String(level || "NO_DATA").toLowerCase().replace("_", "-");
 }
 </script>
 
 <template>
   <article
     class="route-card"
-    :class="[{ selected }, role.toLowerCase(), levelClass(route.sensory_level)]"
+    :class="{ selected }"
     tabindex="0"
     :aria-label="`${role} route. ${formatSensoryIndicator(indicator)}.`"
     data-testid="route-card"
   >
-    <div class="route-card-heading">
-      <div>
-        <p class="route-role">{{ role }}</p>
-        <p class="route-source">{{ formatDataStatus(route.data_status) }}</p>
-      </div>
-      <p class="route-time"><strong>{{ route.duration_minutes }}</strong> min</p>
+    <div class="route-card-head">
+      <p class="route-role">{{ role }}</p>
+      <span v-if="route.recommended" class="chip">Recommended</span>
+      <p class="route-source">{{ formatDataStatus(route.data_status) }}</p>
     </div>
 
-    <div
-      class="sensory-indicator"
-      :class="`indicator-${indicator.toLowerCase().replace('_', '-')}`"
-      :aria-label="`Sensory indicator: ${formatSensoryIndicator(indicator)}`"
-      data-testid="sensory-indicator"
-    >
-      <span class="indicator-icon" aria-hidden="true">{{ indicatorIcon }}</span>
-      <span>
-        <strong>{{ indicator === "LOW" ? "Low" : indicator === "HIGH" ? "High" : "No Data" }}</strong>
-        sensory indicator · {{ formatSensoryIndicator(indicator) }}
-      </span>
-    </div>
+    <p class="route-card-time">
+      <span class="route-card-minutes">{{ route.duration_minutes }}</span>
+      <span class="route-card-unit">min</span>
+      <span class="route-card-distance">{{ distance }}</span>
+    </p>
 
-    <p v-if="route.recommended" class="recommended-badge" data-testid="recommended-route">
-      {{
-        route.congestion_avoidable
-          ? "Our pick for your crowd limit"
-          : "Our pick, though we cannot promise it stays calm"
-      }}
-    </p>
-    <p
-      v-if="route.recommendation_reason"
-      :class="route.recommended ? 'route-explanation' : 'not-recommended-note'"
-      data-testid="recommendation-reason"
-    >
-      {{ route.recommendation_reason }}
-    </p>
+    <div v-if="route.segments?.length">
+      <p class="segment-title">How busy, step by step</p>
+      <PeakStrip :segments="route.segments" :peak-level="peakLevel" />
+    </div>
+    <p v-else class="route-detail">We have no crowd data for this route.</p>
 
     <dl class="route-facts">
       <div>
-        <dt>Distance</dt>
-        <dd>{{ distance }}</dd>
-      </div>
-      <div>
         <dt>Busiest point</dt>
-        <dd class="level-pill" :class="levelClass(route.sensory_level)">
-          {{ formatLoadLevel(route.sensory_level) }}
+        <dd>
+          <span class="level-pill" :class="levelClass(peakLevel)">
+            <BandIcon :level="peakLevel" />
+            {{ formatLoadLevel(peakLevel) }}
+          </span>
         </dd>
       </div>
       <div>
@@ -133,17 +121,48 @@ function levelClass(level) {
       </div>
     </dl>
 
-    <p v-if="route.peak_location" class="route-explanation">
-      Busiest near {{ route.peak_location }}
+    <div
+      class="sensory-indicator"
+      :class="`indicator-${indicator.toLowerCase().replace('_', '-')}`"
+      :aria-label="`Sensory indicator: ${formatSensoryIndicator(indicator)}`"
+      data-testid="sensory-indicator"
+    >
+      <span class="indicator-icon" aria-hidden="true">{{ indicatorIcon }}</span>
+      <span>
+        <strong>{{ indicatorWord }}</strong>
+        sensory indicator · {{ formatSensoryIndicator(indicator) }}
+      </span>
+    </div>
+
+    <p v-if="route.recommended" class="recommended-badge" data-testid="recommended-route">
+      {{
+        route.congestion_avoidable
+          ? "Our pick for your crowd limit"
+          : "Our pick, though we cannot promise it stays calm"
+      }}
     </p>
-    <p class="route-explanation">{{ route.explanation }}</p>
-    <p class="confidence-note">{{ route.confidence_explanation }}</p>
-    <ul v-if="additionalConfidenceReasons.length" class="confidence-reasons">
-      <li v-for="reason in additionalConfidenceReasons" :key="reason">{{ reason }}</li>
-    </ul>
-    <p v-if="route.fallback_reason" class="fallback-warning">
-      {{ route.fallback_reason }}
-    </p>
+
+    <div class="route-detail">
+      <p
+        v-if="route.recommendation_reason"
+        :class="{ 'not-recommended-note': !route.recommended }"
+        data-testid="recommendation-reason"
+      >
+        {{ route.recommendation_reason }}
+      </p>
+      <p v-if="unavoidableNote" class="unavoidable-note" data-testid="unavoidable-peak">
+        {{ unavoidableNote }}
+      </p>
+      <p v-if="route.peak_location">Busiest near {{ route.peak_location }}</p>
+      <p>{{ route.explanation }}</p>
+      <p class="confidence-note">{{ route.confidence_explanation }}</p>
+      <ul v-if="additionalConfidenceReasons.length">
+        <li v-for="reason in additionalConfidenceReasons" :key="reason">{{ reason }}</li>
+      </ul>
+      <p v-if="route.fallback_reason" class="fallback-warning">
+        {{ route.fallback_reason }}
+      </p>
+    </div>
 
     <section
       class="historical-outlook"
@@ -151,28 +170,22 @@ function levelClass(level) {
       data-testid="historical-prediction"
     >
       <p class="segment-title">What to expect</p>
-      <template v-if="prediction?.available">
+      <template v-if="prediction.available">
         <p class="prediction-value">
           <span aria-hidden="true">◷</span>
           Likely {{ formatLoadLevel(prediction.predictedPeak).toLowerCase() }}
           when you get there
         </p>
-        <p>
-          {{ formatConfidence(prediction.confidence) }} · {{ prediction.basis }}.
+        <p>{{ formatConfidence(prediction.confidence) }} · {{ prediction.basis }}.</p>
+        <p v-if="prediction.reason">{{ prediction.reason }}</p>
+      </template>
+      <template v-else>
+        <p class="prediction-unavailable">
+          <span aria-hidden="true">?</span> We cannot say how busy this will be.
         </p>
         <p v-if="prediction.reason">{{ prediction.reason }}</p>
       </template>
-      <p v-else class="prediction-unavailable">
-        <span aria-hidden="true">?</span> We cannot say how busy this will be.
-      </p>
-      <p v-if="!prediction.available && prediction.reason">{{ prediction.reason }}</p>
     </section>
-
-    <div v-if="route.segments?.length" class="segment-section">
-      <p class="segment-title">How busy, step by step</p>
-      <RouteLoadBar :segments="route.segments" />
-    </div>
-    <p v-else class="no-segments">We have no crowd data for this route.</p>
 
     <p v-if="comparisonText" class="comparison-note">{{ comparisonText }}</p>
 

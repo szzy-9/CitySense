@@ -107,14 +107,17 @@ function formatDistance(metres) {
 </script>
 
 <template>
-  <section class="refuge-finder surface-card" aria-labelledby="refuge-finder-title">
+  <section class="refuge-finder" aria-labelledby="refuge-finder-title">
     <div v-if="!open" class="refuge-finder-entry">
-      <div>
-        <p class="screen-label">Quiet places</p>
-        <h2 id="refuge-finder-title">Need a nearby place to pause?</h2>
-        <p>See quiet spots close by, without planning a whole route.</p>
-      </div>
-      <button type="button" class="secondary-button" data-testid="open-refuge-finder" @click="openFinder">
+      <p class="screen-label">Quiet places</p>
+      <h2 id="refuge-finder-title" class="section-title">Need a nearby place to pause?</h2>
+      <p>See quiet spots close by, without planning a whole route.</p>
+      <button
+        type="button"
+        class="secondary-button"
+        data-testid="open-refuge-finder"
+        @click="openFinder"
+      >
         Find a Quiet Place
       </button>
     </div>
@@ -123,7 +126,7 @@ function formatDistance(metres) {
       <div class="refuge-finder-heading">
         <div>
           <p class="screen-label">Quiet places</p>
-          <h2 id="refuge-finder-title">Quiet places nearby</h2>
+          <h2 id="refuge-finder-title" class="section-title">Quiet places nearby</h2>
         </div>
         <button type="button" class="text-button" @click="closeFinder">Close</button>
       </div>
@@ -141,21 +144,16 @@ function formatDistance(metres) {
         Use confirmed start location
       </button>
 
-      <div v-if="refuges.length" class="refuge-result-grid">
-        <article
-          v-for="refuge in refuges"
-          :key="refuge.id"
-          class="refuge-result"
-          data-testid="refuge-result"
-        >
+      <ul v-if="refuges.length" class="refuge-result-list">
+        <li v-for="refuge in refuges" :key="refuge.id" class="refuge-result" data-testid="refuge-result">
           <p class="refuge-type">{{ refuge.refuge_type }}</p>
           <h3>{{ refuge.name }}</h3>
           <p class="refuge-distance-small">{{ formatDistance(refuge.distance_meters) }}</p>
           <p>{{ refuge.short_description }}</p>
           <p class="refuge-availability">{{ refuge.availability }}</p>
           <p class="verification-note">Chosen by us · Not officially verified</p>
-        </article>
-      </div>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

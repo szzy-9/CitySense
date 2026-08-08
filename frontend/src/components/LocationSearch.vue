@@ -29,6 +29,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  placeholder: {
+    type: String,
+    default: "Search a Melbourne address",
+  },
 });
 
 const emit = defineEmits(["update:modelValue", "use-current-location"]);
@@ -123,7 +127,7 @@ function clearPendingSearch() {
       :aria-controls="`${fieldId}-results`"
       :aria-expanded="results.length > 0"
       :aria-describedby="`${fieldId}-status`"
-      placeholder="Search a Melbourne address"
+      :placeholder="placeholder"
       @input="handleInput"
     />
 
