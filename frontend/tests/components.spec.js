@@ -161,7 +161,7 @@ describe("RefugeFinder", () => {
         },
       }),
     }));
-    const wrapper = mount(RefugeFinder, { props: { apiBaseUrl: "" } });
+    const wrapper = mount(RefugeFinder);
 
     await wrapper.get('[data-testid="open-refuge-finder"]').trigger("click");
     await flushPromises();
@@ -181,7 +181,7 @@ describe("RefugeFinder", () => {
       source: "autocomplete",
     };
     const wrapper = mount(RefugeFinder, {
-      props: { apiBaseUrl: "", confirmedOrigin },
+      props: { confirmedOrigin },
     });
 
     await wrapper.get('[data-testid="open-refuge-finder"]').trigger("click");

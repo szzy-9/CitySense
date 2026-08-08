@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from "vue";
 
+import { apiUrl } from "../services/api.js";
 import { UserFacingError, messageForError } from "../userMessages.js";
 
 
@@ -19,10 +20,6 @@ const props = defineProps({
   modelValue: {
     type: Object,
     default: null,
-  },
-  apiBaseUrl: {
-    type: String,
-    default: "",
   },
   allowCurrentLocation: {
     type: Boolean,
@@ -74,7 +71,7 @@ async function search(text) {
   try {
     const params = new URLSearchParams({ q: text });
     const response = await fetch(
-      `${props.apiBaseUrl}/api/geocode/autocomplete?${params.toString()}`,
+      apiUrl(`/api/geocode/autocomplete?${params.toString()}`),
       { signal: requestController.signal },
     );
     const body = await response.json();
