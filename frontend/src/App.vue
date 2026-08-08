@@ -11,8 +11,11 @@ import RouteCard from "./components/RouteCard.vue";
 import { apiUrl } from "./services/api.js";
 import {
   clearWatch,
+  demoLocationOrigin,
   getCurrentPosition,
+  isDemoLocationActive,
   isLocationSupported,
+  setDemoLocationEnabled,
   watchPosition,
 } from "./services/location.js";
 import {
@@ -38,6 +41,7 @@ const THEME_KEY = "citysense.theme";
 const LOAD_LEVELS = ["LOW", "MODERATE", "HIGH", "NO_DATA"];
 
 const theme = ref("dark");
+const demoLocation = ref(isDemoLocationActive());
 const startLocation = ref(null);
 const endLocation = ref(null);
 const currentLocation = ref(null);
@@ -171,6 +175,38 @@ const canFindRoutes = computed(() => {
   );
 });
 
+// A stand-in position is never allowed to pass as a real one.
+const demoLocationNotice = computed(() => {
+  if (!demoLocation.value) {
+    return "";
+  }
+  const point = demoLocationOrigin();
+  return (
+    "Demo Mode is on. CitySense is reporting a fixed position at " +
+    `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}, not reading this device.`
+  );
+});
+
+/*
+ * Turning Demo Mode on or off invalidates any position already on screen, so
+ * the tracked position is dropped and, if a trip is underway, the watch is
+ * restarted against whichever source now applies.
+ */
+async function toggleDemoLocation() {
+  demoLocation.value = setDemoLocationEnabled(!demoLocation.value);
+  errorMessage.value = "";
+  currentLocation.value = null;
+  currentAccuracy.value = null;
+  positionMessage.value = demoLocation.value
+    ? "Demo Mode is on. Positions come from a fixed CBD point."
+    : "Demo Mode is off. Positions come from this device again.";
+
+  await stopLocationTracking();
+  if (currentScreen.value === "navigate") {
+    await startLocationTracking();
+  }
+}
+
 const routeChoices = computed(() => {
   const routes = comparedRoutes.value;
   if (routes.length < 2) {
@@ -181,16 +217,6 @@ const routeChoices = computed(() => {
     role: formatRouteRoles(route.roles, "Alternative"),
     minutes: route.duration_minutes,
   }));
-});
-
-// Overwhelm Mode measures from wherever the user actually is. On Plan that is
-// the confirmed start; once navigating it is the live position, which is
-// always available by then.
-const overwhelmUnavailable = computed(() => {
-  return (
-    refugeLoading.value ||
-    (currentScreen.value === "plan" && !isConfirmedLocation(startLocation.value))
-  );
 });
 
 onMounted(async () => {
@@ -427,19 +453,51 @@ async function rerouteFromCurrentLocation(reason = "off-route") {
   }
 }
 
-async function enterOverwhelmMode() {
-  errorMessage.value = "";
-  const origin =
-    currentScreen.value === "navigate" && isConfirmedLocation(currentLocation.value)
-      ? currentLocation.value
-      : startLocation.value;
-  if (!isConfirmedLocation(origin)) {
-    errorMessage.value = "Confirm a start location before opening Overwhelm Mode.";
-    return;
+/*
+ * Overwhelm Mode has to work from a cold start.
+ *
+ * Someone who needs it has not necessarily planned a trip, and typing an
+ * address is the one thing they cannot do in that moment. So the button asks
+ * the device where it is, and treats a confirmed start as the fallback rather
+ * than the requirement.
+ */
+async function resolveOverwhelmOrigin() {
+  if (
+    currentScreen.value === "navigate" &&
+    isConfirmedLocation(currentLocation.value)
+  ) {
+    return currentLocation.value;
   }
 
+  if (isLocationSupported()) {
+    try {
+      const position = await getCurrentPosition({
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 30000,
+      });
+      const located = locationFromPosition(position, "current_location");
+      currentLocation.value = located;
+      currentAccuracy.value = readPositionAccuracy(position);
+      return located;
+    } catch {
+      // Permission refused or unavailable. A confirmed start still works.
+    }
+  }
+
+  return isConfirmedLocation(startLocation.value) ? startLocation.value : null;
+}
+
+async function enterOverwhelmMode() {
+  errorMessage.value = "";
   refugeLoading.value = true;
   try {
+    const origin = await resolveOverwhelmOrigin();
+    if (!origin) {
+      errorMessage.value =
+        "We could not work out where you are. Allow location access, or search for a start location and try again.";
+      return;
+    }
     const params = new URLSearchParams({
       lat: String(origin.lat),
       lon: String(origin.lon),
@@ -765,10 +823,32 @@ function readPositionAccuracy(position) {
         CitySense
       </button>
       <span class="tagline">Routes scored by their worst moment</span>
-      <button class="theme-toggle" type="button" @click="toggleTheme">
-        {{ theme === "dark" ? "Light mode" : "Dark mode" }}
-      </button>
+      <div class="masthead-controls">
+        <button
+          class="pill-toggle"
+          type="button"
+          :aria-label="theme === 'dark' ? 'Light mode' : 'Dark mode'"
+          @click="toggleTheme"
+        >
+          {{ theme === "dark" ? "Light" : "Dark" }}
+        </button>
+        <button
+          class="pill-toggle"
+          :class="{ 'is-on': demoLocation }"
+          type="button"
+          :aria-pressed="demoLocation"
+          aria-label="Demo Mode: report a fixed CBD position instead of reading this device"
+          data-testid="demo-toggle"
+          @click="toggleDemoLocation"
+        >
+          Demo
+        </button>
+      </div>
     </header>
+
+    <p v-if="demoLocationNotice" class="demo-banner" role="status">
+      {{ demoLocationNotice }}
+    </p>
 
     <main id="main" class="main">
       <div v-if="currentScreen === 'plan'" class="screen">
@@ -1149,7 +1229,7 @@ function readPositionAccuracy(position) {
         class="overwhelm-button"
         type="button"
         aria-label="Enter Overwhelm Mode"
-        :disabled="overwhelmUnavailable"
+        :disabled="refugeLoading"
         @click="enterOverwhelmMode"
       >
         {{ refugeLoading ? "Finding one quiet next step..." : "I'm overwhelmed" }}
