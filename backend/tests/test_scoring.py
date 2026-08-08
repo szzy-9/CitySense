@@ -34,11 +34,12 @@ def test_no_data_is_not_treated_as_low():
 
 
 def test_load_band_boundaries_are_explicit():
+    # People per minute, the unit the live feed reports.
     assert load_level_for_count(None) == NO_DATA
-    assert load_level_for_count(200) == LOW
-    assert load_level_for_count(201) == MODERATE
-    assert load_level_for_count(500) == MODERATE
-    assert load_level_for_count(501) == HIGH
+    assert load_level_for_count(50) == LOW
+    assert load_level_for_count(51) == MODERATE
+    assert load_level_for_count(150) == MODERATE
+    assert load_level_for_count(151) == HIGH
 
 
 def test_route_without_reliable_segments_returns_no_data():
@@ -190,7 +191,7 @@ def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():
     ]
     sensors = [
         _sensor("high", -37.8100, 700),
-        _sensor("low", -37.8140, 100),
+        _sensor("low", -37.8140, 30),
     ]
 
     scored, fastest_id, calmest_id, recommended_id = score_routes(
@@ -248,6 +249,29 @@ def _indicator(peak, tolerance):
     )
 
 
+def test_every_route_is_labelled_so_the_comparison_never_collapses():
+    # One route can win on speed and on calm at once. When it did, the others
+    # were left with no role and the screen showed a single option twice.
+    scored, fastest_id, calmest_id, _ = score_routes(
+        [
+            _route("route-1", -37.8100, 12),
+            _route("route-2", -37.8300, 14),
+            _route("route-3", -37.8500, 16),
+        ],
+        _snapshot([_sensor("s1", -37.8100, 40)]),
+        route_source="live",
+    )
+
+    assert fastest_id == calmest_id == "route-1"
+    assert all(route["roles"] for route in scored)
+    assert [route["id"] for route in scored if "Alternative" in route["roles"]] == [
+        "route-2",
+        "route-3",
+    ]
+    # Three distinct routes remain available to compare.
+    assert len({route["id"] for route in scored}) == 3
+
+
 def _route(route_id, latitude, duration):
     return {
         "id": route_id,
@@ -266,12 +290,12 @@ def _route(route_id, latitude, duration):
     }
 
 
-def _sensor(sensor_id, latitude, count):
+def _sensor(sensor_id, latitude, count, lon=144.9625):
     return {
         "id": sensor_id,
         "name": f"Sensor {sensor_id}",
         "lat": latitude,
-        "lon": 144.9625,
+        "lon": lon,
         "count": count,
     }
 
@@ -305,3 +329,57 @@ def _recommendation_route(
     route = _scored_route(route_id, peak, coverage, average_load, duration)
     route["sensory_indicator"] = indicator
     return route
+
+
+def test_peak_separates_the_doorstep_from_the_stretch_a_route_can_choose():
+    # The only busy sensor sits on the origin, which no route can avoid.
+    scored, _, _, _ = score_routes(
+        [_long_route("route-1", -37.8100)],
+        _snapshot([
+            _sensor("origin", -37.8100, 200, lon=144.9600),
+            _sensor("middle", -37.8100, 20, lon=144.9700),
+        ]),
+        route_source="live",
+    )
+
+    route = scored[0]
+    # The trip really does reach High, and still says so.
+    assert route["sensory_level"] == HIGH
+    assert route["unavoidable_level"] == HIGH
+    # But nothing it could have chosen differently is above Low.
+    assert route["avoidable_level"] == LOW
+
+
+def test_calmest_compares_the_avoidable_stretch_not_the_shared_doorstep():
+    # Both routes leave past the same busy corner, so both peak High. Only the
+    # middle of the trip tells them apart.
+    routes = [_long_route("loud", -37.8100), _long_route("quiet", -37.8140)]
+    sensors = [
+        _sensor("origin-loud", -37.8100, 200, lon=144.9600),
+        _sensor("origin-quiet", -37.8140, 200, lon=144.9600),
+        _sensor("middle-loud", -37.8100, 200, lon=144.9700),
+        _sensor("middle-quiet", -37.8140, 20, lon=144.9700),
+    ]
+
+    scored, _, calmest_id, _ = score_routes(routes, _snapshot(sensors), route_source="live")
+
+    assert {route["sensory_level"] for route in scored} == {HIGH}
+    assert calmest_id == "quiet"
+
+
+def _long_route(route_id, latitude):
+    """A route long enough to have blocks that are not on either doorstep."""
+    return {
+        "id": route_id,
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [
+                [144.9600 + step * 0.0025, latitude] for step in range(9)
+            ],
+        },
+        "distance_meters": 1760,
+        "duration_minutes": 22,
+        "source": "LIVE",
+        "fallback_reason": None,
+        "steps": [],
+    }

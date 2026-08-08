@@ -21,7 +21,11 @@ from backend.services.locations import (
     validate_route_coordinates,
     validate_search_query,
 )
-from backend.services.prediction import add_historical_predictions, parse_departure_time
+from backend.services.prediction import (
+    add_historical_predictions,
+    parse_departure_time,
+    suggest_calmer_departure,
+)
 from backend.services.refuges import get_refuges
 from backend.services.routing import get_walking_routes
 from backend.services.scoring import monitor_route, score_routes
@@ -66,7 +70,9 @@ def create_app(test_config=None):
             "default-src 'self'; "
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https://*.tile.openstreetmap.org; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org "
+            "https://*.basemaps.cartocdn.com; "
+            "font-src 'self'; "
             "connect-src 'self'"
         )
         if request.path.startswith("/assets/"):
@@ -259,6 +265,12 @@ def create_app(test_config=None):
         selected_route = next(
             route for route in scored_routes if route["id"] == recommended_id
         )
+        departure_suggestion = suggest_calmer_departure(
+            selected_route,
+            departure_time,
+            crowd_tolerance,
+            _prediction_thresholds(app.config),
+        )
         if not record_route_search(
             {
                 "start_source": start["source"],
@@ -293,6 +305,7 @@ def create_app(test_config=None):
                 "end": end,
                 "routes": scored_routes,
                 "recommended_route_id": recommended_id,
+                "departure_suggestion": departure_suggestion,
                 "sensors": _unique_route_sensors(scored_routes),
                 "request_settings": {
                     "crowd_tolerance": crowd_tolerance,

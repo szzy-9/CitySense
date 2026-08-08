@@ -3,9 +3,11 @@ from datetime import datetime
 import pytest
 
 from backend.services.prediction import (
+    MELBOURNE_TIMEZONE,
     add_historical_predictions,
     parse_departure_time,
     prediction_confidence,
+    suggest_calmer_departure,
 )
 
 
@@ -34,7 +36,7 @@ def test_historical_median_uses_existing_load_bands_and_can_create_alert():
     routes = [_route()]
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(620, 40, 620, 80),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 40, 12000, 80),
     }
 
     add_historical_predictions(routes, departure, "LOW", THRESHOLDS, lookup)
@@ -42,7 +44,7 @@ def test_historical_median_uses_existing_load_bands_and_can_create_alert():
     prediction = routes[0]
     assert prediction["historical_prediction_available"] is True
     assert prediction["predicted_peak"] == "HIGH"
-    assert prediction["predicted_count"] == 620
+    assert prediction["predicted_count"] == 200
     assert prediction["prediction_confidence"] == "HIGH"
     assert routes[0]["prediction_alert"]["lead_minutes"] == 10
     assert routes[0]["segments"][0]["estimated_arrival_time"].startswith(
@@ -60,7 +62,7 @@ def test_multiple_matching_sensors_use_the_highest_predicted_band():
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
         ("SYNTH-SENSOR-001", 1, 8): _profile(120, 40, 120, 10),
-        ("SYNTH-SENSOR-002", 1, 8): _profile(620, 40, 620, 50),
+        ("SYNTH-SENSOR-002", 1, 8): _profile(12000, 40, 12000, 50),
     }
 
     add_historical_predictions([route], departure, "LOW", THRESHOLDS, lookup)
@@ -73,7 +75,7 @@ def test_low_confidence_profile_does_not_create_a_normal_alert():
     route = _route()
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(620, 2, 620, 500),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 2, 12000, 500),
     }
 
     configured_too_low = {**THRESHOLDS, "minimum_alert_confidence": "LOW"}
@@ -90,7 +92,7 @@ def test_prototype_route_never_has_high_prediction_confidence_or_alert():
     route["route_source"] = "fallback"
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(620, 40, 620, 10),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 40, 12000, 10),
     }
 
     add_historical_predictions([route], departure, "LOW", THRESHOLDS, lookup)
@@ -150,4 +152,54 @@ def _profile(median, samples, mean, standard_deviation):
         "mean_count": mean,
         "std_dev": standard_deviation,
         "data_version": "SYNTHETIC_V1",
+    }
+
+
+def test_waiting_is_offered_when_no_route_can_avoid_the_peak():
+    departure = datetime(2026, 8, 10, 8, 0, tzinfo=MELBOURNE_TIMEZONE)
+    route = _predicted_route()
+    # Busy through the eight o'clock hour, quiet from nine.
+    lookup = {
+        ("SYNTH-A", 0, 8): _profile(12000, 40, 12000, 60),
+        ("SYNTH-A", 0, 9): _profile(600, 4, 600, 60),
+    }
+
+    suggestion = suggest_calmer_departure(
+        route, departure, "MEDIUM", THRESHOLDS, profile_lookup=lookup
+    )
+
+    assert suggestion["minutes_later"] == 60
+    assert suggestion["predicted_peak"] == "LOW"
+    assert suggestion["departure_time"].startswith("2026-08-10T09:00")
+    assert "60 minutes later" in suggestion["message"]
+
+
+def test_no_waiting_is_suggested_when_the_trip_already_fits_the_limit():
+    departure = datetime(2026, 8, 10, 8, 0, tzinfo=MELBOURNE_TIMEZONE)
+    route = _predicted_route(predicted_peak="LOW")
+
+    assert (
+        suggest_calmer_departure(
+            route, departure, "MEDIUM", THRESHOLDS, profile_lookup={}
+        )
+        is None
+    )
+
+
+def _predicted_route(predicted_peak="HIGH"):
+    return {
+        "id": "route-1",
+        "duration_minutes": 10,
+        "historical_prediction_available": True,
+        "predicted_peak": predicted_peak,
+        "segments": [
+            {
+                "id": "segment-1",
+                "matched_sensor_ids": ["SYNTH-A"],
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[144.9600, -37.8100], [144.9650, -37.8100]],
+                },
+            }
+        ],
     }

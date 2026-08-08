@@ -87,7 +87,7 @@ def test_live_counts_use_database_sensor_locations_when_populated(app):
             "location_id": "SYNTH-A",
             "sensed_at": "2026-08-06T00:00:00+00:00",
             "total_count": 125,
-            "interval_minutes": 60,
+            "interval_minutes": 1,
             "source": "LIVE",
         }
     ]
@@ -160,7 +160,7 @@ class FakeResponse:
                 {
                     "location_id": "SYNTH-A",
                     "sensing_datetime": "2026-08-06T00:00:00+00:00",
-                    "total_count": 125,
+                    "total_of_directions": 125,
                 }
             ]
         }

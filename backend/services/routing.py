@@ -10,6 +10,10 @@ ORS_URL = (
 )
 logger = logging.getLogger(__name__)
 
+# Two routes is the minimum that makes a comparison, and three is as many as a
+# phone screen can present without the choice itself becoming the burden.
+MAX_ROUTES = 3
+
 
 # Why live routing failed matters in the logs, not on screen: every cause means
 # the same thing to the person walking, and naming our internals ("authentication
@@ -26,7 +30,7 @@ def get_walking_routes(start, end, api_key, timeout=6, client=None):
         try:
             routes = _request_live_routes(start, end, api_key, timeout, client)
             if len(routes) >= 2:
-                return routes[:2], "live", "OpenRouteService walking routes"
+                return routes[:MAX_ROUTES], "live", "OpenRouteService walking routes"
             logger.warning("OpenRouteService fallback category=insufficient_routes")
         except httpx.TimeoutException:
             logger.warning("OpenRouteService fallback category=timeout")
@@ -54,7 +58,7 @@ def _request_live_routes(start, end, api_key, timeout, client=None):
         ],
         "instructions": True,
         "alternative_routes": {
-            "target_count": 2,
+            "target_count": MAX_ROUTES,
             "weight_factor": 1.6,
             "share_factor": 0.6,
         },
