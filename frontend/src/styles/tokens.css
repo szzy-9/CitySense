@@ -1,0 +1,197 @@
+/*
+ * CitySense design tokens.
+ *
+ * Two rules hold the whole thing together:
+ *
+ * 1. Saturated colour is reserved for sensory load. Nothing else in the
+ *    interface is coloured - no accent buttons, no brand flourishes, no
+ *    coloured links. If something is teal, amber or red it is telling you how
+ *    a street will feel, and nothing else ever competes for that meaning.
+ *
+ * 2. Colour is never the only signal. Every band also carries a word and a
+ *    shape, so the interface works in greyscale and under any colour vision.
+ *
+ * The greys are Melbourne bluestone: the kerbs, laneways and gutters of the
+ * Hoddle Grid the app routes you through.
+ */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/atkinson-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/atkinson-700.woff2") format("woff2");
+}
+
+:root {
+  /* Bluestone */
+  --ground: #12171c;
+  --surface: #1a2129;
+  --surface-raised: #222b34;
+  --line: #2f3a45;
+  --line-strong: #46545f;
+
+  /* Chalk */
+  --ink: #e8edf2;
+  --ink-dim: #9daab6;
+  --ink-faint: #6f7d89;
+
+  /* The load scale. Cool to hot, which stays separable under every common
+     colour vision deficiency in a way green-to-red does not. */
+  --band-low: #4fb3a6;
+  --band-moderate: #e8a33d;
+  --band-high: #e4573d;
+  --band-nodata: #7a8896;
+
+  /* Tinted fills for the same scale, for strip cells and map casings. */
+  --band-low-soft: #1c3b39;
+  --band-moderate-soft: #3d3121;
+  --band-high-soft: #3d2320;
+  --band-nodata-soft: #262d34;
+
+  /* Position is not a load reading, so it sits outside the band scale. */
+  --here: #9db4d8;
+
+  --focus: #ffffff;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius: 0.5rem;
+  --radius-lg: 0.875rem;
+
+  /* Nothing moves on its own. These are for direct responses to a tap only. */
+  --motion: 120ms;
+
+  --font-body: "Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-data: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+
+  /* Anything a thumb must reach is at least this tall. */
+  --tap: 3rem;
+
+  /* One phone column, held to a readable measure even on a monitor. */
+  --column: 34rem;
+
+  color-scheme: dark;
+}
+
+/*
+ * Light mode is available but is not the default. Someone opening this app is
+ * often already overloaded, and a full-brightness screen is one more thing to
+ * absorb.
+ */
+:root[data-theme="light"] {
+  --ground: #f4f6f8;
+  --surface: #ffffff;
+  --surface-raised: #eef1f4;
+  --line: #d3dae0;
+  --line-strong: #a9b4bd;
+
+  --ink: #161d24;
+  --ink-dim: #4a5762;
+  --ink-faint: #6b7883;
+
+  --band-low: #1d7a6f;
+  --band-moderate: #96601a;
+  --band-high: #b03526;
+  --band-nodata: #5a6774;
+
+  --band-low-soft: #dceeeb;
+  --band-moderate-soft: #f6ead6;
+  --band-high-soft: #f8e0dc;
+  --band-nodata-soft: #e5e9ed;
+
+  --here: #2d4c78;
+
+  --focus: #161d24;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--ground);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus must be obvious without hunting for it. White on bluestone, black on
+   chalk, always two pixels clear of the control. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* Opacity alone is not enough here: a half-strength solid fill still reads as
+   the brightest thing on a dark screen, so an unavailable button is drained of
+   its fill rather than dimmed. Each button family sets that in style.css. */
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+h1,
+h2,
+h3,
+p {
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

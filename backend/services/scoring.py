@@ -15,6 +15,11 @@ LOAD_RANK = {
 
 MAX_ROUTE_SEGMENTS = 8
 SENSOR_MATCH_DISTANCE_METERS = 180
+# Nobody can be routed around the street they are standing on. Blocks this
+# close to the origin or the destination are shared by every candidate route,
+# so they are reported separately and kept out of the comparison between
+# routes, where they would only ever cancel out.
+ENDPOINT_ZONE_METERS = 250
 FRESH_DATA_MINUTES = 45
 MIN_HIGH_CONFIDENCE_SENSORS = 3
 MIN_HIGH_CONFIDENCE_COVERAGE = 0.60
@@ -56,6 +61,15 @@ def score_routes(
     calmest["roles"].append("Calmest")
     recommended["roles"].append("Recommended")
 
+    # One route is often both the fastest and the calmest. Naming it twice used
+    # to leave every other route unlabelled, and an unlabelled route was never
+    # shown, so the comparison collapsed to a single option. Calling the
+    # remainder alternatives keeps the honest labels honest and still gives the
+    # user something to compare against.
+    for route in scored_routes:
+        if not route["roles"]:
+            route["roles"].append("Alternative")
+
     for route in scored_routes:
         route["recommended"] = route["id"] == recommended["id"]
         route["congestion_avoidable"] = congestion_avoidable
@@ -78,7 +92,14 @@ def worst_load_level(levels):
 
 def select_calmest_route(routes):
     def calmest_key(route):
-        level_rank = LOAD_RANK.get(route["sensory_level"], 4)
+        # Compare on the stretch a route can actually choose. Every candidate
+        # leaves from the same doorstep, so ranking on the whole-route peak let
+        # one busy corner outside anybody's control flatten the difference
+        # between a calm route and a loud one.
+        comparable = route.get("avoidable_level") or NO_DATA
+        if comparable == NO_DATA:
+            comparable = route["sensory_level"]
+        level_rank = LOAD_RANK.get(comparable, 4)
         average_load = route.get("average_load")
         if average_load is None:
             average_load = math.inf
@@ -131,12 +152,20 @@ def select_recommended_route(routes):
     )
 
 
+# People per minute past a sensor, the unit the City of Melbourne per-minute
+# feed reports and the one the Iteration 1 methodology is written against.
+# These thresholds were previously 200 and 500, which no reading in that unit
+# ever reaches: every street classified Low, and the bands carried no meaning.
+LOW_MAX_PER_MINUTE = 50
+MODERATE_MAX_PER_MINUTE = 150
+
+
 def load_level_for_count(count):
     if count is None:
         return NO_DATA
-    if count <= 200:
+    if count <= LOW_MAX_PER_MINUTE:
         return LOW
-    if count <= 500:
+    if count <= MODERATE_MAX_PER_MINUTE:
         return MODERATE
     return HIGH
 
@@ -220,8 +249,23 @@ def _score_route(
     ]
     public_sensors.sort(key=lambda sensor: sensor["name"])
 
+    _mark_endpoint_segments(segment_records, route["geometry"]["coordinates"])
     sensory_level = worst_load_level(
         [segment["sensory_level"] for segment in segment_records]
+    )
+    avoidable_level = worst_load_level(
+        [
+            segment["sensory_level"]
+            for segment in segment_records
+            if not segment["near_endpoint"]
+        ]
+    )
+    unavoidable_level = worst_load_level(
+        [
+            segment["sensory_level"]
+            for segment in segment_records
+            if segment["near_endpoint"]
+        ]
     )
     observed_segments = sum(
         segment["sensory_level"] != NO_DATA
@@ -276,6 +320,8 @@ def _score_route(
             "segments": segment_records,
             "sensory_level": sensory_level,
             "peak_load": sensory_level,
+            "avoidable_level": avoidable_level,
+            "unavoidable_level": unavoidable_level,
             "sensory_indicator": sensory_indicator,
             "crowd_label": _level_label(sensory_level),
             "crowd_score": peak_count,
@@ -418,6 +464,24 @@ def _build_route_segments(coordinates, sensors):
         )
 
     return segments
+
+
+def _mark_endpoint_segments(segments, route_coordinates):
+    """Flag the blocks a walker cannot route around: the ones they start and finish on."""
+    if not route_coordinates:
+        for segment in segments:
+            segment["near_endpoint"] = False
+        return
+
+    start = route_coordinates[0]
+    end = route_coordinates[-1]
+    for segment in segments:
+        points = segment["geometry"]["coordinates"]
+        middle = points[len(points) // 2]
+        segment["near_endpoint"] = (
+            _haversine(middle, start) <= ENDPOINT_ZONE_METERS
+            or _haversine(middle, end) <= ENDPOINT_ZONE_METERS
+        )
 
 
 def _split_coordinates(coordinates):

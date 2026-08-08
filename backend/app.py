@@ -21,9 +21,14 @@ from backend.services.locations import (
     validate_route_coordinates,
     validate_search_query,
 )
-from backend.services.prediction import add_historical_predictions, parse_departure_time
+from backend.services.prediction import (
+    add_historical_predictions,
+    parse_departure_time,
+    suggest_calmer_departure,
+)
 from backend.services.refuges import get_refuges
 from backend.services.routing import get_walking_routes
+from backend.services.streets import describe_routes_streets
 from backend.services.scoring import monitor_route, score_routes
 
 
@@ -66,7 +71,9 @@ def create_app(test_config=None):
             "default-src 'self'; "
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https://*.tile.openstreetmap.org; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org "
+            "https://*.basemaps.cartocdn.com; "
+            "font-src 'self'; "
             "connect-src 'self'"
         )
         if request.path.startswith("/assets/"):
@@ -255,9 +262,22 @@ def create_app(test_config=None):
             crowd_tolerance,
             _prediction_thresholds(app.config),
         )
+        street_paths = describe_routes_streets(
+            [route["geometry"]["coordinates"] for route in scored_routes],
+            api_key=app.config["ORS_API_KEY"],
+            timeout=app.config["REQUEST_TIMEOUT_SECONDS"],
+        )
+        for route, street_path in zip(scored_routes, street_paths):
+            route["street_path"] = street_path
 
         selected_route = next(
             route for route in scored_routes if route["id"] == recommended_id
+        )
+        departure_suggestion = suggest_calmer_departure(
+            selected_route,
+            departure_time,
+            crowd_tolerance,
+            _prediction_thresholds(app.config),
         )
         if not record_route_search(
             {
@@ -293,6 +313,7 @@ def create_app(test_config=None):
                 "end": end,
                 "routes": scored_routes,
                 "recommended_route_id": recommended_id,
+                "departure_suggestion": departure_suggestion,
                 "sensors": _unique_route_sensors(scored_routes),
                 "request_settings": {
                     "crowd_tolerance": crowd_tolerance,

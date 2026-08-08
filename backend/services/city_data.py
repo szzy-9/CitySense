@@ -18,6 +18,10 @@ LOCATIONS_URL = (
 FALLBACK_FILE = Path(__file__).resolve().parents[1] / "data" / "pedestrian_fallback.json"
 logger = logging.getLogger(__name__)
 LIVE_CACHE_SECONDS = 60
+# Every sensor reports once a minute, so a few hundred of the newest rows cover
+# the whole network without pulling the full hour.
+COUNT_PAGE_SIZE = 100
+COUNT_PAGES = 5
 _live_cache = {"snapshot": None, "stored_at": 0.0}
 
 
@@ -56,17 +60,7 @@ def _read_live_data(timeout, client=None):
     http_client = client or httpx.Client(timeout=timeout)
 
     try:
-        count_params = {
-            "select": (
-                "location_id, max(sensing_datetime) as sensing_datetime, "
-                "sum(total_of_directions) as total_count"
-            ),
-            "group_by": "location_id",
-            "limit": 100,
-        }
-        count_response = http_client.get(COUNTS_URL, params=count_params)
-        count_response.raise_for_status()
-        count_rows = count_response.json().get("results", [])
+        count_rows = _read_count_pages(http_client)
 
         location_rows = _read_database_locations()
         location_source = "DATABASE" if location_rows else "LIVE_API"
@@ -90,6 +84,55 @@ def _read_live_data(timeout, client=None):
     finally:
         if owns_client:
             http_client.close()
+
+
+def _read_count_pages(http_client):
+    """The most recent minute each sensor reported.
+
+    The dataset holds one row per sensor per minute for the past hour. Summing
+    those rows, as this once did, produces an hour of accumulated footfall -
+    twenty thousand people at a busy corner - and comparing that to a
+    per-minute threshold classified the entire city as High. Current load is
+    the newest row, so the rows are read newest first and the first one seen
+    for each sensor wins.
+    """
+    rows = []
+    for page in range(COUNT_PAGES):
+        response = http_client.get(
+            COUNTS_URL,
+            params={
+                "order_by": "sensing_datetime desc",
+                "limit": COUNT_PAGE_SIZE,
+                "offset": page * COUNT_PAGE_SIZE,
+            },
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        rows.extend(results)
+        if len(results) < COUNT_PAGE_SIZE:
+            break
+
+    newest = {}
+    for row in rows:
+        sensor_id = str(row.get("location_id") or row.get("sensor_id") or "")
+        timestamp = row.get("sensing_datetime")
+        if not sensor_id or not timestamp:
+            continue
+        seen = newest.get(sensor_id)
+        if seen is None or timestamp > seen["sensing_datetime"]:
+            newest[sensor_id] = {
+                "location_id": sensor_id,
+                "sensing_datetime": timestamp,
+                "total_count": _total_of_directions(row),
+            }
+    return list(newest.values())
+
+
+def _total_of_directions(row):
+    total = row.get("total_of_directions")
+    if total is not None:
+        return total
+    return (row.get("direction_1") or 0) + (row.get("direction_2") or 0)
 
 
 def _read_location_pages(http_client):
@@ -180,7 +223,7 @@ def _join_live_rows(count_rows, location_rows):
                 "location_id": sensor_id,
                 "sensed_at": timestamp,
                 "total_count": total_count,
-                "interval_minutes": 60,
+                "interval_minutes": 1,
                 "source": "LIVE",
             }
         )
@@ -193,8 +236,9 @@ def _join_live_rows(count_rows, location_rows):
         "readings": readings,
         "message": "Live City of Melbourne pedestrian data",
         "count_semantics": (
-            "Aggregated count from records returned by the City of Melbourne "
-            "past-hour per-minute dataset; completeness is not independently verified."
+            "People per minute in the most recent minute each sensor reported, "
+            "from the City of Melbourne past-hour per-minute dataset; a single "
+            "minute is a live reading, not an average."
         ),
     }
 

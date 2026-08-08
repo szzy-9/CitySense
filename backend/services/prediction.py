@@ -18,6 +18,11 @@ from backend.services.scoring import (
 
 
 MELBOURNE_TIMEZONE = ZoneInfo("Australia/Melbourne")
+# The imported profiles are built from the counts-per-hour dataset, so a
+# median_count is people in a whole hour. Live readings, and therefore the load
+# bands, are people per minute. Banding an hourly total against a per-minute
+# scale reported the CBD as High at three in the morning.
+MINUTES_PER_HOUR = 60
 CONFIDENCE_RANK = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
 ROUTE_UNAVAILABLE = {
     "historical_prediction_available": False,
@@ -51,6 +56,18 @@ def parse_departure_time(value, now=None):
     if parsed.tzinfo is None:
         raise ValueError("Departure time must include a timezone offset.")
     return parsed.astimezone(MELBOURNE_TIMEZONE), False
+
+
+def per_minute_rate(hourly_count):
+    """An hourly profile total expressed in the unit the load bands are written in.
+
+    This is an average minute across the hour, so it reads calmer than a live
+    spot reading of the busiest minute. A forecast says what the hour is
+    usually like; it does not claim to name its worst thirty seconds.
+    """
+    if hourly_count is None:
+        return None
+    return hourly_count / MINUTES_PER_HOUR
 
 
 def prediction_confidence(profile, thresholds):
@@ -159,8 +176,8 @@ def _segment_prediction(segment, arrival_time, lead_minutes, lookup, thresholds)
 
     predictions = [
         {
-            "count": profile["median_count"],
-            "band": load_level_for_count(profile["median_count"]),
+            "count": per_minute_rate(profile["median_count"]),
+            "band": load_level_for_count(per_minute_rate(profile["median_count"])),
             "confidence": prediction_confidence(profile, thresholds),
             "sample_count": profile["sample_count"],
             "data_version": profile["data_version"],
@@ -272,6 +289,105 @@ def _summarise_route(route, crowd_tolerance, thresholds):
         ),
         "reroute_available": True,
     }
+
+
+# Far enough ahead to clear a commuter peak, in steps small enough to be worth
+# acting on. Every candidate is answered from the imported profiles already in
+# memory, so the whole scan costs one database read.
+DEPARTURE_OFFSETS_MINUTES = (15, 30, 45, 60, 75, 90)
+
+
+def suggest_calmer_departure(
+    route,
+    departure_time,
+    crowd_tolerance,
+    thresholds,
+    profile_lookup=None,
+):
+    """The soonest later departure whose predicted peak sits within tolerance.
+
+    Rerouting cannot help when every path crosses the same busy corner. Waiting
+    can, and for a commuter who can flex their start it is usually the only
+    lever that removes a High rather than relabelling it.
+    """
+    threshold_rank = TOLERANCE_MAX_RANK[crowd_tolerance]
+    if not route.get("historical_prediction_available"):
+        return None
+    if LOAD_RANK.get(route.get("predicted_peak"), 4) <= threshold_rank:
+        return None
+
+    segments = route.get("segments", [])
+    sensor_ids = {
+        sensor_id
+        for segment in segments
+        for sensor_id in segment.get("matched_sensor_ids", [])
+    }
+    if not sensor_ids:
+        return None
+
+    leads = _segment_lead_minutes(route)
+    candidates = [
+        departure_time + timedelta(minutes=offset)
+        for offset in DEPARTURE_OFFSETS_MINUTES
+    ]
+    arrival_times = [
+        candidate + timedelta(minutes=lead)
+        for candidate in candidates
+        for lead in leads
+    ]
+    if profile_lookup is None:
+        profile_lookup = get_historical_profiles_for_times(sensor_ids, arrival_times)
+
+    for offset, candidate in zip(DEPARTURE_OFFSETS_MINUTES, candidates):
+        peak = _predicted_peak_at(segments, leads, candidate, profile_lookup)
+        if peak is None or peak == NO_DATA:
+            continue
+        if LOAD_RANK.get(peak, 4) <= threshold_rank:
+            return {
+                "departure_time": candidate.isoformat(),
+                "minutes_later": offset,
+                "predicted_peak": peak,
+                "message": (
+                    f"Leaving {offset} minutes later drops the busiest point to "
+                    f"{peak.lower()}, based on the same weekday and hour in past weeks."
+                ),
+            }
+    return None
+
+
+def _predicted_peak_at(segments, leads, departure_time, lookup):
+    bands = []
+    for segment, lead in zip(segments, leads):
+        arrival = departure_time + timedelta(minutes=lead)
+        profiles = [
+            lookup.get((sensor_id, arrival.weekday(), arrival.hour))
+            for sensor_id in segment.get("matched_sensor_ids", [])
+        ]
+        counts = [
+            per_minute_rate(profile["median_count"]) for profile in profiles if profile
+        ]
+        if counts:
+            bands.append(load_level_for_count(max(counts)))
+    if not bands:
+        return None
+    return worst_load_level(bands)
+
+
+def _segment_lead_minutes(route):
+    segments = route.get("segments", [])
+    lengths = [
+        _geometry_length(segment["geometry"]["coordinates"]) for segment in segments
+    ]
+    total_length = sum(lengths)
+    leads = []
+    elapsed_fraction = 0.0
+    for segment_length in lengths:
+        if total_length > 0:
+            elapsed_fraction += segment_length / total_length
+        else:
+            elapsed_fraction += 1 / max(len(segments), 1)
+        leads.append(route["duration_minutes"] * elapsed_fraction)
+    return leads
 
 
 def _geometry_length(coordinates):
