@@ -1,14 +1,15 @@
 <script setup>
 import { ref } from "vue";
 
+import { apiUrl } from "../services/api.js";
+import {
+  getCurrentPosition,
+  isLocationSupported,
+} from "../services/location.js";
 import { UserFacingError, messageForError } from "../userMessages.js";
 
 
 const props = defineProps({
-  apiBaseUrl: {
-    type: String,
-    default: "",
-  },
   confirmedOrigin: {
     type: Object,
     default: null,
@@ -20,36 +21,33 @@ const loading = ref(false);
 const message = ref("");
 const refuges = ref([]);
 
-function openFinder() {
+async function openFinder() {
   open.value = true;
   refuges.value = [];
   message.value = "";
 
-  if (!navigator.geolocation) {
+  if (!isLocationSupported()) {
     message.value = "Current Location is not supported. You can use a confirmed start location.";
     return;
   }
 
   loading.value = true;
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      loadRefuges({
-        label: "Current Location",
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
-        source: "current_location",
-      });
-    },
-    () => {
-      loading.value = false;
-      message.value = "Location permission was not available. The rest of CitySense still works.";
-    },
-    {
+  try {
+    const position = await getCurrentPosition({
       enableHighAccuracy: false,
       timeout: 10000,
       maximumAge: 30000,
-    },
-  );
+    });
+    await loadRefuges({
+      label: "Current Location",
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+      source: "current_location",
+    });
+  } catch {
+    loading.value = false;
+    message.value = "Location permission was not available. The rest of CitySense still works.";
+  }
 }
 
 function useConfirmedOrigin() {
@@ -70,7 +68,7 @@ async function loadRefuges(origin) {
       source: origin.source,
     });
     const response = await fetch(
-      `${props.apiBaseUrl}/api/refuges?${params.toString()}`,
+      apiUrl(`/api/refuges?${params.toString()}`),
     );
     const body = await response.json();
     if (!response.ok) {

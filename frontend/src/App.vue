@@ -7,6 +7,13 @@ import MapView from "./components/MapView.vue";
 import OverwhelmMode from "./components/OverwhelmMode.vue";
 import RefugeFinder from "./components/RefugeFinder.vue";
 import RouteCard from "./components/RouteCard.vue";
+import { apiUrl } from "./services/api.js";
+import {
+  clearWatch,
+  getCurrentPosition,
+  isLocationSupported,
+  watchPosition,
+} from "./services/location.js";
 import {
   buildRouteRequest,
   buildCalmestComparison,
@@ -23,11 +30,6 @@ import {
   selectRouteDeparture,
 } from "./routeDisplay.js";
 import { UserFacingError, messageForError } from "./userMessages.js";
-
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://localhost:5000" : "");
 
 const startLocation = ref(null);
 const endLocation = ref(null);
@@ -58,6 +60,8 @@ const arrivalDistanceMetres = Number(
   import.meta.env.VITE_ARRIVAL_DISTANCE_METERS || 35,
 );
 let geolocationWatchId = null;
+let geolocationWatchStarting = false;
+let locationTrackingRequested = false;
 let monitoringIntervalId = null;
 let monitoringInFlight = false;
 let monitoringController = null;
@@ -129,13 +133,13 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  stopLocationTracking();
+  void stopLocationTracking();
   stopRouteMonitoring();
 });
 
 async function loadRefuges() {
   try {
-    const response = await fetch(API_BASE_URL + "/api/refuges");
+    const response = await fetch(apiUrl("/api/refuges"));
     if (!response.ok) {
       throw new Error();
     }
@@ -160,32 +164,29 @@ function setEndLocation(location) {
   selectedRouteId.value = "";
 }
 
-function useCurrentLocation() {
+async function useCurrentLocation() {
   errorMessage.value = "";
-  if (!navigator.geolocation) {
+  if (!isLocationSupported()) {
     errorMessage.value = "Current Location is not supported by this browser.";
     return;
   }
 
   locating.value = true;
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const location = locationFromPosition(position, "current_location");
-      currentLocation.value = location;
-      currentAccuracy.value = readPositionAccuracy(position);
-      setStartLocation(location);
-      locating.value = false;
-    },
-    () => {
-      errorMessage.value = "Current Location was not available. Search for an address instead.";
-      locating.value = false;
-    },
-    {
+  try {
+    const position = await getCurrentPosition({
       enableHighAccuracy: false,
       timeout: 10000,
       maximumAge: 30000,
-    },
-  );
+    });
+    const location = locationFromPosition(position, "current_location");
+    currentLocation.value = location;
+    currentAccuracy.value = readPositionAccuracy(position);
+    setStartLocation(location);
+  } catch {
+    errorMessage.value = "Current Location was not available. Search for an address instead.";
+  } finally {
+    locating.value = false;
+  }
 }
 
 async function findRoutes() {
@@ -270,7 +271,7 @@ async function requestRoutes(options = {}) {
 }
 
 async function fetchRouteCandidates(origin) {
-  const response = await fetch(API_BASE_URL + "/api/routes", {
+  const response = await fetch(apiUrl("/api/routes"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(
@@ -357,7 +358,7 @@ async function enterOverwhelmMode() {
       source: origin.source,
     });
     const response = await fetch(
-      API_BASE_URL + "/api/refuges?" + params.toString(),
+      apiUrl("/api/refuges?" + params.toString()),
     );
     const body = await response.json();
     if (!response.ok || !body.nearest_refuge) {
@@ -391,10 +392,10 @@ function returnToPlan() {
 function changeScreen(screen) {
   currentScreen.value = screen;
   if (screen === "navigate") {
-    startLocationTracking();
+    void startLocationTracking();
     startRouteMonitoring();
   } else {
-    stopLocationTracking();
+    void stopLocationTracking();
     stopRouteMonitoring();
   }
   nextTick(() => {
@@ -402,35 +403,56 @@ function changeScreen(screen) {
   });
 }
 
-function startLocationTracking() {
+async function startLocationTracking() {
+  locationTrackingRequested = true;
   if (
     geolocationWatchId !== null ||
-    !navigator.geolocation
+    geolocationWatchStarting ||
+    !isLocationSupported()
   ) {
     return;
   }
 
-  geolocationWatchId = navigator.geolocation.watchPosition(
-    (position) => {
-      currentLocation.value = locationFromPosition(position, "current_location");
-      currentAccuracy.value = readPositionAccuracy(position);
-      positionMessage.value = "Current position updated. Route has not been recalculated.";
-    },
-    () => {
-      positionMessage.value = "Current position updates are paused.";
-    },
-    {
-      enableHighAccuracy: false,
-      timeout: 10000,
-      maximumAge: 15000,
-    },
-  );
+  geolocationWatchStarting = true;
+  try {
+    const watchId = await watchPosition(
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 15000,
+        minimumUpdateInterval: 5000,
+      },
+      (position) => {
+        currentLocation.value = locationFromPosition(position, "current_location");
+        currentAccuracy.value = readPositionAccuracy(position);
+        positionMessage.value = "Current position updated. Route has not been recalculated.";
+      },
+      () => {
+        positionMessage.value = "Current position updates are paused.";
+      },
+    );
+    if (!locationTrackingRequested) {
+      await clearWatch(watchId);
+      return;
+    }
+    geolocationWatchId = watchId;
+  } catch {
+    positionMessage.value = "Current position updates are paused.";
+  } finally {
+    geolocationWatchStarting = false;
+  }
 }
 
-function stopLocationTracking() {
-  if (geolocationWatchId !== null && navigator.geolocation) {
-    navigator.geolocation.clearWatch(geolocationWatchId);
-    geolocationWatchId = null;
+async function stopLocationTracking() {
+  locationTrackingRequested = false;
+  const watchId = geolocationWatchId;
+  geolocationWatchId = null;
+  if (watchId !== null) {
+    try {
+      await clearWatch(watchId);
+    } catch {
+      // Navigation has already stopped. No location data is retained.
+    }
   }
 }
 
@@ -475,7 +497,7 @@ async function monitorActiveRoute() {
   monitoringInFlight = true;
   monitoringController = new AbortController();
   try {
-    const response = await fetch(API_BASE_URL + "/api/routes/monitor", {
+    const response = await fetch(apiUrl("/api/routes/monitor"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: monitoringController.signal,
@@ -664,7 +686,6 @@ function readPositionAccuracy(position) {
             field-id="start"
             label="Start"
             :model-value="startLocation"
-            :api-base-url="API_BASE_URL"
             :allow-current-location="true"
             :locating="locating"
             @update:model-value="setStartLocation"
@@ -685,7 +706,6 @@ function readPositionAccuracy(position) {
             field-id="destination"
             label="Destination"
             :model-value="endLocation"
-            :api-base-url="API_BASE_URL"
             @update:model-value="setEndLocation"
           />
         </div>
@@ -762,7 +782,6 @@ function readPositionAccuracy(position) {
       </section>
 
       <RefugeFinder
-        :api-base-url="API_BASE_URL"
         :confirmed-origin="startLocation"
       />
 
