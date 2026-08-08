@@ -47,6 +47,9 @@ const distance = computed(() => {
 
 const coverage = computed(() => Math.round((props.route.coverage || 0) * 100));
 const unavoidableNote = computed(() => describeUnavoidablePeak(props.route));
+// Which way the walk actually goes. A score tells someone how a trip will
+// feel; this is how they recognise it as a trip they know.
+const streetPath = computed(() => (props.route.street_path || []).join(" \u2192 "));
 const indicator = computed(() => props.route.sensory_indicator || "NO_DATA");
 const peakLevel = computed(() => props.route.sensory_level || "NO_DATA");
 // The headline note already states the first reason, so listing it again just
@@ -143,6 +146,9 @@ function levelClass(level) {
     </p>
 
     <div class="route-detail">
+      <p v-if="streetPath" class="street-path" data-testid="street-path">
+        {{ streetPath }}
+      </p>
       <p
         v-if="route.recommendation_reason"
         :class="{ 'not-recommended-note': !route.recommended }"
@@ -153,7 +159,6 @@ function levelClass(level) {
       <p v-if="unavoidableNote" class="unavoidable-note" data-testid="unavoidable-peak">
         {{ unavoidableNote }}
       </p>
-      <p v-if="route.peak_location">Busiest near {{ route.peak_location }}</p>
       <p>{{ route.explanation }}</p>
       <p class="confidence-note">{{ route.confidence_explanation }}</p>
       <ul v-if="additionalConfidenceReasons.length">

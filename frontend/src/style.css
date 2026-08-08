@@ -709,6 +709,13 @@ input[type="datetime-local"] {
   border-left: 2px solid var(--line-strong);
 }
 
+/* Wayfinding, not commentary, so it reads at full strength above the caveats
+   that follow it. */
+.street-path {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* What the route could not choose, kept distinct from what it did. */
 .unavoidable-note {
   color: var(--ink);
