@@ -8,7 +8,9 @@ import {
   closestRouteProgress,
   compareObservedPeaks,
   formatDataStatus,
+  describeUnavoidablePeak,
   formatLoadLevel,
+  formatRouteRoles,
   formatSensoryIndicator,
   isArrived,
   isConfirmedLocation,
@@ -296,3 +298,41 @@ function location(lon, lat) {
     source: "current_location",
   };
 }
+
+test("route role labels read as a sentence and leave the recommended badge alone", () => {
+  assert.equal(formatRouteRoles(["Fastest"]), "Fastest");
+  assert.equal(formatRouteRoles(["Fastest", "Calmest"]), "Fastest and Calmest");
+  assert.equal(
+    formatRouteRoles(["Fastest", "Calmest", "Recommended"]),
+    "Fastest and Calmest",
+  );
+  assert.equal(formatRouteRoles(["Recommended"]), "Selected");
+  assert.equal(formatRouteRoles([]), "Selected");
+  assert.equal(formatRouteRoles(undefined), "Selected");
+});
+
+test("the doorstep is reported apart from the stretch a route could choose", () => {
+  assert.equal(
+    describeUnavoidablePeak({
+      sensory_level: "HIGH",
+      unavoidable_level: "HIGH",
+      avoidable_level: "LOW",
+    }),
+    "High near the start and end, which no route avoids. Nothing above low in between.",
+  );
+
+  // Nothing to explain when the worst point is one the route actually chose.
+  assert.equal(
+    describeUnavoidablePeak({
+      sensory_level: "HIGH",
+      unavoidable_level: "LOW",
+      avoidable_level: "HIGH",
+    }),
+    "",
+  );
+  assert.equal(describeUnavoidablePeak({}), "");
+  assert.match(
+    describeUnavoidablePeak({ unavoidable_level: "HIGH", avoidable_level: "NO_DATA" }),
+    /no crowd data for the rest/,
+  );
+});

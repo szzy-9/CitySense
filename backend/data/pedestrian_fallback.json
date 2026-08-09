@@ -1,15 +1,74 @@
 {
   "sensors": [
-    {"id": "demo-1", "name": "Bourke Street Mall", "lat": -37.81365, "lon": 144.96440, "count": 620},
-    {"id": "demo-2", "name": "Queen Victoria Market", "lat": -37.80770, "lon": 144.95680, "count": 260},
-    {"id": "demo-3", "name": "Flinders and Elizabeth", "lat": -37.81790, "lon": 144.96500, "count": 780},
-    {"id": "demo-4", "name": "Swanston and Collins", "lat": -37.81510, "lon": 144.96610, "count": 540},
-    {"id": "demo-5", "name": "Carlton Gardens", "lat": -37.80480, "lon": 144.97130, "count": 120},
-    {"id": "demo-6", "name": "Southern Cross", "lat": -37.81800, "lon": 144.95300, "count": 340},
-    {"id": "demo-7", "name": "State Library", "lat": -37.81010, "lon": 144.96470, "count": 450},
-    {"id": "demo-8", "name": "Yarra Riverside", "lat": -37.82100, "lon": 144.96900, "count": 90},
-    {"id": "demo-9", "name": "Lonsdale and William", "lat": -37.81160, "lon": 144.95700, "count": 200},
-    {"id": "demo-10", "name": "Treasury Gardens", "lat": -37.81400, "lon": 144.97400, "count": 80}
+    {
+      "id": "demo-1",
+      "name": "Bourke Street Mall",
+      "lat": -37.81365,
+      "lon": 144.9644,
+      "count": 190
+    },
+    {
+      "id": "demo-2",
+      "name": "Queen Victoria Market",
+      "lat": -37.8077,
+      "lon": 144.9568,
+      "count": 95
+    },
+    {
+      "id": "demo-3",
+      "name": "Flinders and Elizabeth",
+      "lat": -37.8179,
+      "lon": 144.965,
+      "count": 225
+    },
+    {
+      "id": "demo-4",
+      "name": "Swanston and Collins",
+      "lat": -37.8151,
+      "lon": 144.9661,
+      "count": 165
+    },
+    {
+      "id": "demo-5",
+      "name": "Carlton Gardens",
+      "lat": -37.8048,
+      "lon": 144.9713,
+      "count": 22
+    },
+    {
+      "id": "demo-6",
+      "name": "Southern Cross",
+      "lat": -37.818,
+      "lon": 144.953,
+      "count": 120
+    },
+    {
+      "id": "demo-7",
+      "name": "State Library",
+      "lat": -37.8101,
+      "lon": 144.9647,
+      "count": 140
+    },
+    {
+      "id": "demo-8",
+      "name": "Yarra Riverside",
+      "lat": -37.821,
+      "lon": 144.969,
+      "count": 12
+    },
+    {
+      "id": "demo-9",
+      "name": "Lonsdale and William",
+      "lat": -37.8116,
+      "lon": 144.957,
+      "count": 45
+    },
+    {
+      "id": "demo-10",
+      "name": "Treasury Gardens",
+      "lat": -37.814,
+      "lon": 144.974,
+      "count": 8
+    }
   ]
 }
-

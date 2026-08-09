@@ -59,6 +59,53 @@ export function formatConfidence(confidence) {
   return CONFIDENCE_LABELS[confidence] || CONFIDENCE_LABELS.LOW;
 }
 
+// A route cannot avoid the street its walker is standing on. When the doorstep
+// is the worst part of a trip, saying so separates what the route chose from
+// what it was handed, instead of writing the whole trip off as High.
+export function describeUnavoidablePeak(route) {
+  const unavoidable = route?.unavoidable_level || "NO_DATA";
+  const avoidable = route?.avoidable_level || "NO_DATA";
+  const unavoidableRank = LOAD_RANK[unavoidable];
+  if (!unavoidableRank || unavoidableRank <= (LOAD_RANK[avoidable] || 0)) {
+    return "";
+  }
+
+  const near = `${formatLoadLevel(unavoidable)} near the start and end, which no route avoids.`;
+  if (!LOAD_RANK[avoidable]) {
+    return `${near} We have no crowd data for the rest of it.`;
+  }
+  return `${near} Nothing above ${formatLoadLevel(avoidable).toLowerCase()} in between.`;
+}
+
+// datetime-local wants wall-clock time with no zone, in the browser's own
+// timezone. Handing it an ISO string with an offset silently leaves the field
+// blank.
+export function toDateTimeLocalValue(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const pad = (value) => String(value).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// "Recommended" is shown as its own badge, so repeating it here produced
+// labels like "Fastest and Calmest and Recommended" that wrapped over three
+// lines on a phone.
+export function formatRouteRoles(roles, fallback = "Selected") {
+  const named = (roles || []).filter((role) => role !== "Recommended");
+  if (!named.length) {
+    return fallback;
+  }
+  if (named.length === 1) {
+    return named[0];
+  }
+  return `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
+}
+
 export function buildCalmestComparison(fastest, calmest) {
   if (!fastest || !calmest) {
     return "";

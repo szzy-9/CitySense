@@ -124,7 +124,15 @@ def read_extract(source_path, window_days):
             if location_id not in sensors:
                 sensors[location_id] = {
                     "location_id": location_id,
-                    "sensor_name": (row.get("sensor_name") or "").strip() or location_id,
+                    # sensor_name is the device code (Swa295_T); the
+                    # description is the place a person would recognise
+                    # (Melbourne Central). The code was reaching the screen as
+                    # "Busiest near Swa148_T".
+                    "sensor_name": (
+                        (row.get("sensor_description") or "").strip()
+                        or (row.get("sensor_name") or "").strip()
+                        or location_id
+                    ),
                     "latitude": latitude,
                     "longitude": longitude,
                 }
