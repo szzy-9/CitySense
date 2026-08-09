@@ -79,7 +79,18 @@ def _read_live_data(timeout, client=None):
         if not snapshot["sensors"]:
             raise ValueError("The city datasets returned no matching sensors")
 
+        thresholds = _read_database_thresholds(
+            [sensor["id"] for sensor in snapshot["sensors"]]
+        )
+        threshold_sensor_count = _attach_sensor_thresholds(
+            snapshot["sensors"],
+            thresholds,
+        )
         snapshot["sensor_location_source"] = location_source
+        snapshot["sensor_threshold_source"] = (
+            "NEON" if threshold_sensor_count else "NO_DATA"
+        )
+        snapshot["threshold_sensor_count"] = threshold_sensor_count
         return snapshot
     finally:
         if owns_client:
@@ -170,6 +181,36 @@ def _read_database_locations():
         }
         for row in list_active_sensor_locations()
     ]
+
+
+def _read_database_thresholds(location_ids):
+    if not has_app_context() or not location_ids:
+        return {}
+    from backend.repositories import get_sensor_thresholds
+
+    # One IN query loads all thresholds needed by this live snapshot. Route
+    # segmentation must not query Neon once per route or sensor.
+    return get_sensor_thresholds(location_ids)
+
+
+def _attach_sensor_thresholds(sensors, thresholds):
+    matched_count = 0
+    for sensor in sensors:
+        threshold = thresholds.get(str(sensor["id"]))
+        if not threshold:
+            continue
+        p50 = threshold.get("p50")
+        p80 = threshold.get("p80")
+        try:
+            valid = float(p50) >= 0 and float(p80) >= float(p50)
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            continue
+        sensor["p50_hourly"] = p50
+        sensor["p80_hourly"] = p80
+        matched_count += 1
+    return matched_count
 
 
 def _join_live_rows(count_rows, location_rows):
@@ -274,5 +315,7 @@ def _read_fallback_data():
         "message": "Local sample data (no live timestamp)",
         "cache_status": "fallback",
         "sensor_location_source": "FALLBACK",
+        "sensor_threshold_source": "NO_DATA",
+        "threshold_sensor_count": 0,
         "count_semantics": "Local prototype fallback counts.",
     }

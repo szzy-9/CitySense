@@ -24,6 +24,7 @@ FRESH_DATA_MINUTES = 45
 MIN_HIGH_CONFIDENCE_SENSORS = 3
 MIN_HIGH_CONFIDENCE_COVERAGE = 0.60
 MIN_CLASSIFICATION_COVERAGE = 0.25
+MINUTES_PER_HOUR = 60
 
 TOLERANCE_MAX_RANK = {
     "LOW": LOAD_RANK[LOW],
@@ -152,20 +153,25 @@ def select_recommended_route(routes):
     )
 
 
-# People per minute past a sensor, the unit the City of Melbourne per-minute
-# feed reports and the one the Iteration 1 methodology is written against.
-# These thresholds were previously 200 and 500, which no reading in that unit
-# ever reaches: every street classified Low, and the bands carried no meaning.
-LOW_MAX_PER_MINUTE = 50
-MODERATE_MAX_PER_MINUTE = 150
+def load_level_for_count(count, p50_hourly=None, p80_hourly=None):
+    """Classify a live one-minute count against one sensor's hourly thresholds.
 
-
-def load_level_for_count(count):
-    if count is None:
+    ``count * 60`` is an hourly-equivalent pace: what an hour would total if
+    the latest minute continued unchanged. It is not a measured hourly count.
+    """
+    try:
+        minute_count = float(count)
+        p50 = float(p50_hourly)
+        p80 = float(p80_hourly)
+    except (TypeError, ValueError):
         return NO_DATA
-    if count <= LOW_MAX_PER_MINUTE:
+    if minute_count < 0 or p50 < 0 or p80 < p50:
+        return NO_DATA
+
+    hourly_equivalent = minute_count * MINUTES_PER_HOUR
+    if hourly_equivalent <= p50:
         return LOW
-    if count <= MODERATE_MAX_PER_MINUTE:
+    if hourly_equivalent <= p80:
         return MODERATE
     return HIGH
 
@@ -213,7 +219,7 @@ def confidence_reasons(
     if pedestrian_source != "live":
         reasons.append("Showing sample crowd counts, not today's.")
     if sensory_level == NO_DATA:
-        reasons.append("No sensors are reporting near this route.")
+        reasons.append("No usable crowd classification is available for this route.")
     if not _is_fresh(updated_at, now):
         reasons.append("The latest crowd counts are over an hour old.")
     if sensor_count < MIN_HIGH_CONFIDENCE_SENSORS:
@@ -277,9 +283,18 @@ def _score_route(
         else 0
     )
 
-    counts = [sensor["count"] for sensor in public_sensors]
+    classified_sensors = [
+        sensor
+        for sensor in public_sensors
+        if sensor["sensory_level"] in LOAD_RANK
+    ]
+    counts = [sensor["count"] for sensor in classified_sensors]
     average_load = round(sum(counts) / len(counts)) if counts else None
-    peak_sensor = max(public_sensors, key=lambda sensor: sensor["count"], default=None)
+    peak_sensor = max(
+        classified_sensors,
+        key=lambda sensor: (LOAD_RANK[sensor["sensory_level"]], sensor["count"]),
+        default=None,
+    )
     peak_count = peak_sensor["count"] if peak_sensor else None
     peak_location = (
         peak_sensor["name"]
@@ -291,7 +306,7 @@ def _score_route(
         route_source=route_source,
         pedestrian_source=pedestrian_snapshot["source"],
         updated_at=pedestrian_snapshot["updated_at"],
-        sensor_count=len(public_sensors),
+        sensor_count=len(classified_sensors),
         coverage=coverage,
         sensory_level=sensory_level,
     )
@@ -299,7 +314,7 @@ def _score_route(
         route_source=route_source,
         pedestrian_source=pedestrian_snapshot["source"],
         updated_at=pedestrian_snapshot["updated_at"],
-        sensor_count=len(public_sensors),
+        sensor_count=len(classified_sensors),
         coverage=coverage,
         sensory_level=sensory_level,
     )
@@ -327,6 +342,7 @@ def _score_route(
             "crowd_score": peak_count,
             "sensor_count": len(public_sensors),
             "matched_sensor_count": len(public_sensors),
+            "classified_sensor_count": len(classified_sensors),
             "matched_sensors": public_sensors,
             "coverage": coverage,
             "average_load": average_load,
@@ -342,6 +358,9 @@ def _score_route(
             "last_updated": pedestrian_snapshot["updated_at"],
             "route_source": route_source,
             "pedestrian_source": pedestrian_snapshot["source"],
+            "sensor_threshold_source": pedestrian_snapshot.get(
+                "sensor_threshold_source", "NO_DATA"
+            ),
             "explanation": _route_explanation(
                 sensory_level,
                 peak_location,
@@ -418,7 +437,7 @@ def monitor_route(
             "You can switch to a calmer route."
         )
     elif upcoming_peak == NO_DATA:
-        message = "No sensors are reporting on the road ahead."
+        message = "No usable crowd classification is available for the road ahead."
     else:
         message = "The road ahead stays within your crowd limit."
 
@@ -446,7 +465,26 @@ def _build_route_segments(coordinates, sensors):
 
     for index, segment_coordinates in enumerate(coordinate_groups, start=1):
         matched = _match_sensors(segment_coordinates, sensors)
-        peak_sensor = max(matched, key=lambda sensor: sensor["count"], default=None)
+        classified = [
+            (sensor, _sensor_load_level(sensor))
+            for sensor in matched
+        ]
+        valid = [
+            (sensor, level)
+            for sensor, level in classified
+            if level in LOAD_RANK
+        ]
+        sensory_level = worst_load_level([level for _sensor, level in valid])
+        peak_candidates = [
+            sensor
+            for sensor, level in valid
+            if level == sensory_level
+        ]
+        peak_sensor = max(
+            peak_candidates,
+            key=lambda sensor: sensor["count"],
+            default=None,
+        )
         peak_count = peak_sensor["count"] if peak_sensor else None
 
         segments.append(
@@ -456,8 +494,9 @@ def _build_route_segments(coordinates, sensors):
                     "type": "LineString",
                     "coordinates": segment_coordinates,
                 },
-                "sensory_level": load_level_for_count(peak_count),
+                "sensory_level": sensory_level,
                 "sensor_count": len(matched),
+                "classified_sensor_count": len(valid),
                 "peak_count": peak_count,
                 "_matched_sensors": matched,
             }
@@ -538,14 +577,35 @@ def _sample_route(coordinates):
 
 
 def _public_sensor(sensor):
+    sensory_level = _sensor_load_level(sensor)
     return {
         "id": str(sensor["id"]),
         "name": sensor["name"],
         "lat": sensor["lat"],
         "lon": sensor["lon"],
         "count": sensor["count"],
-        "sensory_level": load_level_for_count(sensor["count"]),
+        "sensory_level": sensory_level,
+        "threshold_source": (
+            "NEON" if _sensor_has_valid_threshold(sensor) else "NO_DATA"
+        ),
     }
+
+
+def _sensor_load_level(sensor):
+    return load_level_for_count(
+        sensor.get("count"),
+        sensor.get("p50_hourly"),
+        sensor.get("p80_hourly"),
+    )
+
+
+def _sensor_has_valid_threshold(sensor):
+    try:
+        p50 = float(sensor.get("p50_hourly"))
+        p80 = float(sensor.get("p80_hourly"))
+    except (TypeError, ValueError):
+        return False
+    return p50 >= 0 and p80 >= p50
 
 
 def _route_data_status(route_source, pedestrian_source, sensory_level):
@@ -560,6 +620,8 @@ def _route_data_status(route_source, pedestrian_source, sensory_level):
 
 def _route_explanation(sensory_level, peak_location, segments):
     if sensory_level == NO_DATA:
+        if any(segment.get("sensor_count", 0) for segment in segments):
+            return "Live counts are available, but usable sensor thresholds are missing."
         return "No sensors are reporting along this route right now."
 
     level = _level_label(sensory_level)

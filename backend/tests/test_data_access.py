@@ -161,6 +161,15 @@ def test_live_counts_use_neon_sensor_locations_when_populated(app):
                 """
             )
         )
+        db.session.execute(
+            text(
+                """
+                INSERT INTO citysense.sensor_threshold
+                    (location_id, p50, p80, first_seen, last_seen, completeness)
+                VALUES (101, 6000, 9000, '2025-01-01', '2026-07-31', 0.98)
+                """
+            )
+        )
         db.session.commit()
         fake_client = FakeCityClient()
 
@@ -172,7 +181,11 @@ def test_live_counts_use_neon_sensor_locations_when_populated(app):
 
     assert snapshot["source"] == "live"
     assert snapshot["sensor_location_source"] == "NEON"
+    assert snapshot["sensor_threshold_source"] == "NEON"
+    assert snapshot["threshold_sensor_count"] == 1
     assert snapshot["sensors"][0]["name"] == "SYNTH-A"
+    assert snapshot["sensors"][0]["p50_hourly"] == 6000.0
+    assert snapshot["sensors"][0]["p80_hourly"] == 9000.0
     assert snapshot["readings"] == [
         {
             "location_id": "101",
@@ -183,6 +196,22 @@ def test_live_counts_use_neon_sensor_locations_when_populated(app):
         }
     ]
     assert fake_client.urls == [COUNTS_URL]
+
+
+def test_neon_unavailable_falls_back_to_city_locations_without_fake_thresholds(app):
+    with app.app_context():
+        snapshot = get_pedestrian_snapshot(
+            use_live=True,
+            timeout=1,
+            client=FakeCityAndLocationClient(),
+        )
+
+    assert snapshot["source"] == "live"
+    assert snapshot["sensor_location_source"] == "LIVE_API"
+    assert snapshot["sensor_threshold_source"] == "NO_DATA"
+    assert snapshot["threshold_sensor_count"] == 0
+    assert snapshot["sensors"][0]["id"] == "101"
+    assert "p50_hourly" not in snapshot["sensors"][0]
 
 
 def test_missing_live_count_is_not_normalised_to_zero_or_low():
@@ -296,6 +325,51 @@ def test_data_status_counts_only_ds_tables_and_keeps_live_readings_unpersisted(
     assert set(response.get_json()) == set(counts)
 
 
+def test_route_status_reports_neon_profile_table_separately_from_prediction(
+    app, client
+):
+    with app.app_context():
+        _create_ds_tables()
+        db.session.execute(
+            text(
+                """
+                INSERT INTO citysense.sensor_load_profile
+                    (location_id, dow, hour_of_day, median_count, median_per_min,
+                     mean_count, mean_per_min, std_dev, n_obs, load_band,
+                     confidence, band_version)
+                VALUES
+                    (101, 1, 8, 140, 2.5, 150, 2.7, 20, 40,
+                     'moderate', 'medium', 'DS_V1')
+                """
+            )
+        )
+        db.session.commit()
+
+    response = client.post(
+        "/api/routes",
+        json={
+            "start": {
+                "label": "Federation Square",
+                "lat": -37.81798,
+                "lon": 144.96913,
+                "source": "autocomplete",
+            },
+            "end": {
+                "label": "Queen Victoria Market",
+                "lat": -37.80758,
+                "lon": 144.95678,
+                "source": "autocomplete",
+            },
+            "crowd_tolerance": "MEDIUM",
+        },
+    )
+    status = response.get_json()["data_status"]
+
+    assert response.status_code == 200
+    assert status["historical_profile_source"] == "NEON"
+    assert status["historical_prediction_available"] is False
+
+
 def _create_ds_tables():
     db.session.execute(text("ATTACH DATABASE ':memory:' AS citysense"))
     statements = [
@@ -407,3 +481,28 @@ class FakeCityClient:
     def get(self, url, params=None):
         self.urls.append(url)
         return FakeResponse()
+
+
+class FakeCityAndLocationClient:
+    def get(self, url, params=None):
+        if url == COUNTS_URL:
+            return FakeResponse()
+        return FakeLocationResponse()
+
+
+class FakeLocationResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "total_count": 1,
+            "results": [
+                {
+                    "location_id": 101,
+                    "sensor_description": "City fallback sensor",
+                    "latitude": -37.81,
+                    "longitude": 144.96,
+                }
+            ],
+        }

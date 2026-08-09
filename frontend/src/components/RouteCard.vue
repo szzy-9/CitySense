@@ -69,9 +69,7 @@ const prediction = computed(() => ({
 const indicatorIcon = computed(() => {
   return { LOW: "✓", HIGH: "!", NO_DATA: "?" }[indicator.value] || "?";
 });
-const indicatorWord = computed(() => {
-  return { LOW: "Low", HIGH: "High" }[indicator.value] || "No Data";
-});
+const indicatorText = computed(() => formatSensoryIndicator(indicator.value));
 
 function levelClass(level) {
   return "band-" + String(level || "NO_DATA").toLowerCase().replace("_", "-");
@@ -132,8 +130,8 @@ function levelClass(level) {
     >
       <span class="indicator-icon" aria-hidden="true">{{ indicatorIcon }}</span>
       <span>
-        <strong>{{ indicatorWord }}</strong>
-        sensory indicator · {{ formatSensoryIndicator(indicator) }}
+        <strong>{{ indicatorText }}</strong>
+        <span class="indicator-context">Crowd tolerance</span>
       </span>
     </div>
 

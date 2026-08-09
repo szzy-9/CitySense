@@ -34,12 +34,31 @@ def test_no_data_is_not_treated_as_low():
 
 
 def test_load_band_boundaries_are_explicit():
-    # People per minute, the unit the live feed reports.
-    assert load_level_for_count(None) == NO_DATA
-    assert load_level_for_count(50) == LOW
-    assert load_level_for_count(51) == MODERATE
-    assert load_level_for_count(150) == MODERATE
-    assert load_level_for_count(151) == HIGH
+    # Live people/minute is converted to an hourly-equivalent pace before it
+    # is compared with this sensor's DS hourly p50/p80 values.
+    assert load_level_for_count(None, 3000, 9000) == NO_DATA
+    assert load_level_for_count(50, 3000, 9000) == LOW
+    assert load_level_for_count(51, 3000, 9000) == MODERATE
+    assert load_level_for_count(150, 3000, 9000) == MODERATE
+    assert load_level_for_count(151, 3000, 9000) == HIGH
+
+
+def test_live_minute_count_is_compared_as_an_hourly_equivalent_pace():
+    # 10 people in the latest minute is compared as a 600 people/hour pace.
+    assert load_level_for_count(10, 600, 1200) == LOW
+    assert load_level_for_count(10, 599, 1200) == MODERATE
+    assert load_level_for_count(10, 300, 599) == HIGH
+
+
+def test_same_live_count_uses_each_sensor_own_thresholds():
+    assert load_level_for_count(10, 600, 1200) == LOW
+    assert load_level_for_count(10, 300, 500) == HIGH
+
+
+def test_missing_or_invalid_sensor_threshold_is_no_data():
+    assert load_level_for_count(10) == NO_DATA
+    assert load_level_for_count(10, 600, None) == NO_DATA
+    assert load_level_for_count(10, 900, 600) == NO_DATA
 
 
 def test_route_without_reliable_segments_returns_no_data():
@@ -212,6 +231,41 @@ def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():
     ] == LOW
 
 
+def test_segment_and_route_use_worst_sensor_specific_band():
+    sensors = [
+        _sensor("locally-low", -37.81, 10, p50_hourly=600, p80_hourly=1200),
+        _sensor("locally-high", -37.81, 10, p50_hourly=300, p80_hourly=500),
+    ]
+
+    scored, _, _, _ = score_routes(
+        [_route("route", -37.81, 10)],
+        _snapshot(sensors),
+        route_source="live",
+    )
+
+    assert scored[0]["segments"][0]["sensory_level"] == HIGH
+    assert scored[0]["sensory_level"] == HIGH
+    assert scored[0]["crowd_score"] == 10
+
+
+def test_matched_sensor_without_threshold_does_not_become_low():
+    sensor = _sensor("missing-threshold", -37.81, 10)
+    sensor.pop("p50_hourly")
+    sensor.pop("p80_hourly")
+
+    scored, _, _, _ = score_routes(
+        [_route("route", -37.81, 10)],
+        _snapshot([sensor]),
+        route_source="live",
+    )
+
+    assert scored[0]["matched_sensor_count"] == 1
+    assert scored[0]["classified_sensor_count"] == 0
+    assert scored[0]["segments"][0]["sensory_level"] == NO_DATA
+    assert scored[0]["sensory_level"] == NO_DATA
+    assert scored[0]["coverage"] == 0
+
+
 def test_monitor_reports_first_threshold_breach_with_live_data():
     result = monitor_route(
         _route("route", -37.81, 10)["geometry"]["coordinates"],
@@ -290,13 +344,22 @@ def _route(route_id, latitude, duration):
     }
 
 
-def _sensor(sensor_id, latitude, count, lon=144.9625):
+def _sensor(
+    sensor_id,
+    latitude,
+    count,
+    lon=144.9625,
+    p50_hourly=3000,
+    p80_hourly=9000,
+):
     return {
         "id": sensor_id,
         "name": f"Sensor {sensor_id}",
         "lat": latitude,
         "lon": lon,
         "count": count,
+        "p50_hourly": p50_hourly,
+        "p80_hourly": p80_hourly,
     }
 
 

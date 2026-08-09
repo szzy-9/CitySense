@@ -19,8 +19,9 @@ describe("RouteCard sensory indicator", () => {
     });
 
     const indicator = wrapper.get('[data-testid="sensory-indicator"]');
-    expect(indicator.text()).toContain("Low sensory indicator");
     expect(indicator.text()).toContain("Within your crowd limit");
+    expect(indicator.text()).toContain("Crowd tolerance");
+    expect(indicator.text()).not.toContain("Low sensory indicator");
     expect(indicator.get(".indicator-icon").text()).toBe("✓");
     expect(indicator.classes()).toContain("indicator-low");
   });
@@ -38,8 +39,7 @@ describe("RouteCard sensory indicator", () => {
     });
 
     const indicator = wrapper.get('[data-testid="sensory-indicator"]');
-    expect(indicator.text()).toContain("No Data sensory indicator");
-    expect(indicator.text()).toContain("Not enough reliable data");
+    expect(indicator.text()).toContain("Not enough data");
     expect(indicator.text()).not.toContain("Low sensory indicator");
   });
 
@@ -52,9 +52,30 @@ describe("RouteCard sensory indicator", () => {
     });
 
     const indicator = wrapper.get('[data-testid="sensory-indicator"]');
-    expect(indicator.text()).toContain("High sensory indicator");
     expect(indicator.text()).toContain("Above your crowd limit");
     expect(indicator.get(".indicator-icon").text()).toBe("!");
+  });
+
+  it.each([
+    ["LOW", "Low"],
+    ["MODERATE", "Moderate"],
+    ["HIGH", "High"],
+  ])("keeps actual %s density in the Busiest point", (level, label) => {
+    const wrapper = mount(RouteCard, {
+      props: {
+        route: route({
+          sensory_indicator: "LOW",
+          sensory_level: level,
+          peak_load: level,
+        }),
+        role: "Calmest",
+      },
+    });
+
+    expect(wrapper.get(".level-pill").text()).toContain(label);
+    expect(wrapper.get('[data-testid="sensory-indicator"]').text()).toContain(
+      "Within your crowd limit",
+    );
   });
 
   it("keeps the route and its action keyboard accessible", () => {

@@ -8,7 +8,7 @@ const LOAD_LABELS = {
 const INDICATOR_LABELS = {
   LOW: "Within your crowd limit",
   HIGH: "Above your crowd limit",
-  NO_DATA: "Not enough reliable data",
+  NO_DATA: "Not enough data",
 };
 
 const DATA_STATUS_LABELS = {

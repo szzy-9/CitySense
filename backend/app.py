@@ -7,6 +7,7 @@ from backend.database import database_health
 from backend.models import db
 from backend.repositories import (
     data_table_counts,
+    database_has_historical_profiles,
     database_has_refuges,
 )
 from backend.services.city_data import get_pedestrian_snapshot
@@ -310,13 +311,20 @@ def create_app(test_config=None):
                     "sensor_location_source": pedestrian_snapshot.get(
                         "sensor_location_source", "FALLBACK"
                     ),
+                    "sensor_threshold_source": pedestrian_snapshot.get(
+                        "sensor_threshold_source", "NO_DATA"
+                    ),
+                    "threshold_sensor_count": pedestrian_snapshot.get(
+                        "threshold_sensor_count", 0
+                    ),
                     "historical_profile_source": (
                         "NEON"
-                        if any(
-                            route["historical_prediction_available"]
-                            for route in scored_routes
-                        )
+                        if database_has_historical_profiles()
                         else "NO_DATA"
+                    ),
+                    "historical_prediction_available": any(
+                        route["historical_prediction_available"]
+                        for route in scored_routes
                     ),
                     "refuge_source": (
                         "NEON" if database_has_refuges() else "CURATED_PROTOTYPE"
@@ -358,6 +366,12 @@ def create_app(test_config=None):
             {
                 **monitoring,
                 "data_source": pedestrian_snapshot["source"].upper(),
+                "sensor_threshold_source": pedestrian_snapshot.get(
+                    "sensor_threshold_source", "NO_DATA"
+                ),
+                "threshold_sensor_count": pedestrian_snapshot.get(
+                    "threshold_sensor_count", 0
+                ),
                 "cache_status": pedestrian_snapshot.get("cache_status"),
                 "updated_at": pedestrian_snapshot["updated_at"],
             }
