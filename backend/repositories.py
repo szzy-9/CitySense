@@ -1,9 +1,9 @@
 """Database access for CitySense-owned and DS-managed data.
 
 The DS tables are reflected from the existing ``citysense`` schema and are
-read only. Only ``route_searches`` is owned and written by this backend.
-Functions return plain dictionaries so database rows never cross the API
-boundary. Database errors are rolled back and converted to safe empty results.
+read only. Functions return plain dictionaries so database rows never cross
+the API boundary. Database errors are rolled back and converted to safe empty
+results.
 """
 
 from collections import defaultdict
@@ -13,7 +13,7 @@ from sqlalchemy import MetaData, Table, cast, func, or_, select, String
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.database import safe_rollback
-from backend.models import RouteSearch, db
+from backend.models import db
 
 
 DATA_SCHEMA = "citysense"
@@ -167,17 +167,6 @@ def list_database_refuges():
 def list_refuges():
     """Repository-level refuge listing retained as the public data-access name."""
     return list_database_refuges()
-
-
-def record_route_search(metadata):
-    search = RouteSearch(**metadata)
-    try:
-        db.session.add(search)
-        db.session.commit()
-        return True
-    except SQLAlchemyError:
-        safe_rollback()
-        return False
 
 
 def data_table_counts():

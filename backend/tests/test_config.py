@@ -48,5 +48,4 @@ def test_neon_url_keeps_ssl_and_uses_small_resilient_pool(monkeypatch):
         "pool_size": 3,
         "max_overflow": 2,
         "pool_recycle": 300,
-        "connect_args": {"options": "-csearch_path=public"},
     }

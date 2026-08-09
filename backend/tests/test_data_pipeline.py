@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import inspect
 
-from backend.app import create_app
 from backend.models import db
 from scripts import load_data
 from scripts.load_data import load_datasets
@@ -152,52 +151,6 @@ def test_missing_optional_files_are_reported_and_strict_mode_fails(
     assert "fatal" in capsys.readouterr().out
 
 
-def test_initialization_creates_only_backend_owned_route_searches(app):
+def test_application_initialization_creates_no_tables(app):
     with app.app_context():
-        assert inspect(db.engine).get_table_names() == ["route_searches"]
-
-
-def test_old_route_search_table_gets_additive_metadata_columns(tmp_path):
-    database_path = tmp_path / "legacy.db"
-    url = f"sqlite:///{database_path.as_posix()}"
-    engine = create_engine(url)
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                CREATE TABLE route_searches (
-                    id INTEGER PRIMARY KEY,
-                    start_id VARCHAR(80) NOT NULL,
-                    end_id VARCHAR(80) NOT NULL,
-                    fastest_route_id VARCHAR(40) NOT NULL,
-                    calmest_route_id VARCHAR(40) NOT NULL,
-                    route_source VARCHAR(20) NOT NULL,
-                    pedestrian_source VARCHAR(20) NOT NULL,
-                    created_at DATETIME NOT NULL
-                )
-                """
-            )
-        )
-    engine.dispose()
-
-    legacy_app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": url,
-            "USE_LIVE_CITY_DATA": False,
-            "ORS_API_KEY": "",
-            "FRONTEND_ORIGIN": "http://127.0.0.1:5173",
-        }
-    )
-    with legacy_app.app_context():
-        columns = {column["name"] for column in inspect(db.engine).get_columns("route_searches")}
-        db.session.remove()
-        db.engine.dispose()
-
-    assert {
-        "selected_route_type",
-        "confidence",
-        "route_count",
-        "used_historical_prediction",
-        "prediction_confidence",
-    }.issubset(columns)
+        assert inspect(db.engine).get_table_names() == []

@@ -51,20 +51,6 @@ PREDICTION_MIN_ALERT_CONFIDENCE=MEDIUM
 
 Render supplies `PORT`. Do not store secret values in `render.yaml` or Git.
 
-## Initialize the database
-
-Application startup creates missing tables. To initialize or verify the schema explicitly:
-
-```text
-python scripts/init_db.py
-```
-
-Expected output:
-
-```text
-Database schema is ready.
-```
-
 ## Load approved data
 
 The Render filesystem is ephemeral. Load approved CSV files from a trusted workstation or one-off environment with `DATABASE_URL` configured securely.

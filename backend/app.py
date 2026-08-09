@@ -3,12 +3,11 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from backend.config import Config, ROOT_DIR
-from backend.database import database_health, initialize_database
+from backend.database import database_health
 from backend.models import db
 from backend.repositories import (
     data_table_counts,
     database_has_refuges,
-    record_route_search,
 )
 from backend.services.city_data import get_pedestrian_snapshot
 from backend.services.geocoding import (
@@ -54,10 +53,6 @@ def create_app(test_config=None):
         resources={r"/api/*": {"origins": allowed_origins}},
         methods=["GET", "POST", "OPTIONS"],
     )
-
-    with app.app_context():
-        if not initialize_database():
-            app.logger.warning("Database schema initialization is deferred")
 
     @app.after_request
     def add_security_headers(response):
@@ -279,30 +274,6 @@ def create_app(test_config=None):
             crowd_tolerance,
             _prediction_thresholds(app.config),
         )
-        if not record_route_search(
-            {
-                "start_source": start["source"],
-                "end_source": end["source"],
-                "fastest_route_id": fastest_id,
-                "calmest_route_id": calmest_id,
-                "route_source": route_source,
-                "pedestrian_source": pedestrian_snapshot["source"],
-                "selected_route_type": "RECOMMENDED",
-                "confidence": selected_route.get("confidence"),
-                "route_count": len(scored_routes),
-                "used_historical_prediction": selected_route[
-                    "historical_prediction_available"
-                ],
-                "prediction_confidence": (
-                    selected_route["prediction_confidence"]
-                    if selected_route["historical_prediction_available"]
-                    else None
-                ),
-            }
-        ):
-            app.logger.warning("Database route search commit failed")
-            return _error("The database is temporarily unavailable.", 503)
-
         used_fallback = (
             route_source == "fallback"
             or pedestrian_snapshot["source"] == "fallback"

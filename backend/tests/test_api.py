@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy.exc import SQLAlchemyError
-
-from backend.models import RouteSearch, db
+from backend.models import db
 
 
 START = {
@@ -394,23 +392,12 @@ def test_non_json_route_request_is_rejected(client):
     assert "JSON" in response.get_json()["error"]
 
 
-def test_database_error_returns_service_unavailable(client, monkeypatch):
-    def fail_to_commit():
-        raise SQLAlchemyError("database unavailable")
+def test_route_generation_does_not_write_search_metadata(client, monkeypatch):
+    def unexpected_write(*args, **kwargs):
+        raise AssertionError("/api/routes must not write route-search metadata")
 
-    monkeypatch.setattr(db.session, "commit", fail_to_commit)
-    response = client.post("/api/routes", json=route_payload())
-
-    assert response.status_code == 503
-    assert response.get_json()["error"] == "The database is temporarily unavailable."
-
-
-def test_search_stores_source_types_not_addresses_or_coordinates(app, client):
+    monkeypatch.setattr(db.session, "add", unexpected_write)
+    monkeypatch.setattr(db.session, "commit", unexpected_write)
     response = client.post("/api/routes", json=route_payload())
 
     assert response.status_code == 200
-    with app.app_context():
-        search = db.session.query(RouteSearch).first()
-        assert search.start_source == "autocomplete"
-        assert search.end_source == "autocomplete"
-        assert START["label"] not in search.start_source

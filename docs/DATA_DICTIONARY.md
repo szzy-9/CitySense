@@ -76,9 +76,3 @@ Primary key: `refuge_id`.
 | `verified` | boolean | No | Same boolean formats; blank defaults to false. False is never official verification. |
 | `data_source` | text, max 80 | No | Provenance of the refuge record. |
 | `last_checked_at` | timestamp with offset | No | Last source review time, not a live-open status. |
-
-## `route_searches`
-
-This table stores operational metadata only. It does not store labels, full addresses, coordinates, route geometry, location history, disability data, sensory reports, or performance timings.
-
-Stored fields include start/end source category, fastest/calmest route IDs, route and pedestrian source, selected route type, confidence, candidate count, whether historical prediction was used, prediction confidence, and creation time.

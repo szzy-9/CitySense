@@ -291,7 +291,7 @@ def test_data_status_counts_only_ds_tables_and_keeps_live_readings_unpersisted(
         "refuge_opening_hours": 0,
         "pedestrian_readings": None,
     }
-    assert public_tables == ["route_searches"]
+    assert public_tables == []
     assert response.status_code == 200
     assert set(response.get_json()) == set(counts)
 

@@ -48,9 +48,6 @@ def read_engine_options(database_url):
         "pool_size": 3,
         "max_overflow": 2,
         "pool_recycle": 300,
-        # Application writes are limited to public.route_searches. DS data is
-        # always read through explicitly qualified citysense.* table names.
-        "connect_args": {"options": "-csearch_path=public"},
     }
 
 
