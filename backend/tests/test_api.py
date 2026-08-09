@@ -267,7 +267,11 @@ def test_data_status_reports_safe_counts(client):
     body = response.get_json()
 
     assert response.status_code == 200
-    assert body["sensor_locations"] == {"loaded": False, "row_count": 0}
+    assert body["sensor_locations"] == {"loaded": False, "row_count": None}
+    assert body["pedestrian_readings"] == {
+        "loaded": False,
+        "row_count": None,
+    }
     assert "url" not in str(body).lower()
     assert "password" not in str(body).lower()
 

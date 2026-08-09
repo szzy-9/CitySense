@@ -63,7 +63,7 @@ def _read_live_data(timeout, client=None):
         count_rows = _read_count_pages(http_client)
 
         location_rows = _read_database_locations()
-        location_source = "DATABASE" if location_rows else "LIVE_API"
+        location_source = "NEON" if location_rows else "LIVE_API"
         if not location_rows:
             location_rows = _read_location_pages(http_client)
         snapshot = _join_live_rows(count_rows, location_rows)
@@ -71,7 +71,7 @@ def _read_live_data(timeout, client=None):
         # A populated database may be stale or use identifiers that do not match
         # the live count feed. In that case, safely fall back to the live location
         # catalogue instead of treating missing joins as quiet streets.
-        if not snapshot["sensors"] and location_source == "DATABASE":
+        if not snapshot["sensors"] and location_source == "NEON":
             location_rows = _read_location_pages(http_client)
             location_source = "LIVE_API"
             snapshot = _join_live_rows(count_rows, location_rows)

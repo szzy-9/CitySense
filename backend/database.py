@@ -1,13 +1,13 @@
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.models import db
+from backend.models import RouteSearch, db
 
 
 def initialize_database():
-    """Create missing tables without deleting or replacing existing data."""
+    """Create only the backend-owned route-search table when it is missing."""
     try:
-        db.create_all()
+        RouteSearch.__table__.create(bind=db.engine, checkfirst=True)
         _add_route_search_metadata_columns()
         return True
     except SQLAlchemyError:

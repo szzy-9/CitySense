@@ -17,7 +17,7 @@ def main():
             print("Database initialization could not be verified.")
             return 1
 
-    print("Database schema is ready.")
+    print("Backend-owned route_searches schema is ready; DS tables were not changed.")
     return 0
 
 

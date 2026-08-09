@@ -2,26 +2,24 @@
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from backend.repositories import get_historical_profiles_for_times
+from backend.repositories import (
+    get_historical_profiles_for_times,
+    normalize_confidence,
+    normalize_load_band,
+)
 from backend.services.locations import haversine_distance
 from backend.services.scoring import (
     LOAD_RANK,
     NO_DATA,
     TOLERANCE_MAX_RANK,
-    load_level_for_count,
     worst_load_level,
 )
 
 
 MELBOURNE_TIMEZONE = ZoneInfo("Australia/Melbourne")
-# The imported profiles are built from the counts-per-hour dataset, so a
-# median_count is people in a whole hour. Live readings, and therefore the load
-# bands, are people per minute. Banding an hourly total against a per-minute
-# scale reported the CBD as High at three in the morning.
 MINUTES_PER_HOUR = 60
 CONFIDENCE_RANK = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
 ROUTE_UNAVAILABLE = {
@@ -70,27 +68,9 @@ def per_minute_rate(hourly_count):
     return hourly_count / MINUTES_PER_HOUR
 
 
-def prediction_confidence(profile, thresholds):
-    """Classify an imported profile by sample size and coefficient of variation."""
-    sample_count = profile.get("sample_count") or 0
-    mean_count = profile.get("mean_count") or 0
-    std_count = profile.get("std_dev") or 0
-    if mean_count == 0:
-        coefficient = 0 if std_count == 0 else math.inf
-    else:
-        coefficient = std_count / mean_count
-
-    if (
-        sample_count >= thresholds["high_min_samples"]
-        and coefficient <= thresholds["high_max_cv"]
-    ):
-        return "HIGH"
-    if (
-        sample_count >= thresholds["medium_min_samples"]
-        and coefficient <= thresholds["medium_max_cv"]
-    ):
-        return "MEDIUM"
-    return "LOW"
+def prediction_confidence(profile, thresholds=None):
+    """Use the DS-provided confidence instead of creating another classifier."""
+    return normalize_confidence(profile.get("confidence"))
 
 
 def add_historical_predictions(
@@ -174,16 +154,22 @@ def _segment_prediction(segment, arrival_time, lead_minutes, lookup, thresholds)
             ),
         }
 
-    predictions = [
-        {
-            "count": per_minute_rate(profile["median_count"]),
-            "band": load_level_for_count(per_minute_rate(profile["median_count"])),
-            "confidence": prediction_confidence(profile, thresholds),
-            "sample_count": profile["sample_count"],
-            "data_version": profile["data_version"],
+    predictions = [_profile_prediction(profile) for profile in profiles]
+    predictions = [prediction for prediction in predictions if prediction]
+    if not predictions:
+        return {
+            "historical_prediction_available": False,
+            "predicted_count": None,
+            "predicted_band": NO_DATA,
+            "prediction_confidence": "LOW",
+            "prediction_basis": None,
+            "predicted_for": arrival_time.isoformat(),
+            "profile_sensor_count": 0,
+            "prediction_lead_minutes": lead_minutes,
+            "prediction_unavailable_reason": (
+                "No usable past pattern for this stretch at this time of day."
+            ),
         }
-        for profile in profiles
-    ]
     predicted_band = worst_load_level([item["band"] for item in predictions])
     peak_items = [item for item in predictions if item["band"] == predicted_band]
     peak_item = max(peak_items, key=lambda item: item["count"])
@@ -203,6 +189,26 @@ def _segment_prediction(segment, arrival_time, lead_minutes, lookup, thresholds)
         "prediction_data_version": peak_item["data_version"],
         "prediction_lead_minutes": lead_minutes,
         "prediction_unavailable_reason": None,
+    }
+
+
+def _profile_prediction(profile):
+    rate = profile.get("median_per_min")
+    if rate is None:
+        rate = per_minute_rate(profile.get("median_count"))
+    band = normalize_load_band(profile.get("load_band"))
+    try:
+        rate = float(rate)
+    except (TypeError, ValueError):
+        return None
+    if rate < 0 or band == NO_DATA:
+        return None
+    return {
+        "count": rate,
+        "band": band,
+        "confidence": prediction_confidence(profile),
+        "sample_count": profile.get("sample_count") or 0,
+        "data_version": profile.get("data_version"),
     }
 
 
@@ -363,11 +369,14 @@ def _predicted_peak_at(segments, leads, departure_time, lookup):
             lookup.get((sensor_id, arrival.weekday(), arrival.hour))
             for sensor_id in segment.get("matched_sensor_ids", [])
         ]
-        counts = [
-            per_minute_rate(profile["median_count"]) for profile in profiles if profile
+        profile_bands = [
+            normalize_load_band(profile.get("load_band"))
+            for profile in profiles
+            if profile
         ]
-        if counts:
-            bands.append(load_level_for_count(max(counts)))
+        profile_bands = [band for band in profile_bands if band != NO_DATA]
+        if profile_bands:
+            bands.append(worst_load_level(profile_bands))
     if not bands:
         return None
     return worst_load_level(bands)

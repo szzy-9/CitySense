@@ -32,11 +32,35 @@ def test_missing_profiles_return_explicit_unavailable_result():
     assert routes[0]["prediction_alert"] is None
 
 
-def test_historical_median_uses_existing_load_bands_and_can_create_alert():
+def test_profile_without_ds_load_band_is_not_independently_classified():
     routes = [_route()]
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 40, 12000, 80),
+        ("SYNTH-SENSOR-001", 1, 8): {
+            "median_per_min": 200,
+            "sample_count": 40,
+            "confidence": "high",
+            "data_version": "SYNTHETIC_V1",
+        }
+    }
+
+    add_historical_predictions(routes, departure, "LOW", THRESHOLDS, lookup)
+
+    assert routes[0]["historical_prediction_available"] is False
+    assert routes[0]["predicted_peak"] == "NO_DATA"
+
+
+def test_ds_median_per_min_load_band_and_confidence_create_alert():
+    routes = [_route()]
+    departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
+    lookup = {
+        ("SYNTH-SENSOR-001", 1, 8): _profile(
+            200,
+            40,
+            "high",
+            "high",
+            median_count=60,
+        ),
     }
 
     add_historical_predictions(routes, departure, "LOW", THRESHOLDS, lookup)
@@ -61,8 +85,8 @@ def test_multiple_matching_sensors_use_the_highest_predicted_band():
     route["segments"][1]["matched_sensor_ids"] = ["SYNTH-SENSOR-001"]
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(120, 40, 120, 10),
-        ("SYNTH-SENSOR-002", 1, 8): _profile(12000, 40, 12000, 50),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(2, 40, "low", "high"),
+        ("SYNTH-SENSOR-002", 1, 8): _profile(200, 40, "high", "high"),
     }
 
     add_historical_predictions([route], departure, "LOW", THRESHOLDS, lookup)
@@ -75,7 +99,7 @@ def test_low_confidence_profile_does_not_create_a_normal_alert():
     route = _route()
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 2, 12000, 500),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(200, 2, "high", "low"),
     }
 
     configured_too_low = {**THRESHOLDS, "minimum_alert_confidence": "LOW"}
@@ -92,7 +116,7 @@ def test_prototype_route_never_has_high_prediction_confidence_or_alert():
     route["route_source"] = "fallback"
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
     lookup = {
-        ("SYNTH-SENSOR-001", 1, 8): _profile(12000, 40, 12000, 10),
+        ("SYNTH-SENSOR-001", 1, 8): _profile(200, 40, "high", "high"),
     }
 
     add_historical_predictions([route], departure, "LOW", THRESHOLDS, lookup)
@@ -101,9 +125,9 @@ def test_prototype_route_never_has_high_prediction_confidence_or_alert():
     assert route["prediction_alert"] is None
 
 
-def test_prediction_confidence_handles_zero_mean_without_division_error():
-    assert prediction_confidence(_profile(0, 40, 0, 0), THRESHOLDS) == "HIGH"
-    assert prediction_confidence(_profile(0, 40, 0, 1), THRESHOLDS) == "LOW"
+def test_prediction_confidence_uses_normalized_ds_value():
+    assert prediction_confidence(_profile(0, 40, "low", "high"), THRESHOLDS) == "HIGH"
+    assert prediction_confidence(_profile(0, 40, "low", "unknown"), THRESHOLDS) == "LOW"
 
 
 def test_departure_time_requires_timezone_and_defaults_to_melbourne():
@@ -145,12 +169,13 @@ def _route():
     }
 
 
-def _profile(median, samples, mean, standard_deviation):
+def _profile(rate, samples, band, confidence, median_count=None):
     return {
-        "median_count": median,
+        "median_count": median_count,
+        "median_per_min": rate,
         "sample_count": samples,
-        "mean_count": mean,
-        "std_dev": standard_deviation,
+        "load_band": band,
+        "confidence": confidence,
         "data_version": "SYNTHETIC_V1",
     }
 
@@ -160,8 +185,8 @@ def test_waiting_is_offered_when_no_route_can_avoid_the_peak():
     route = _predicted_route()
     # Busy through the eight o'clock hour, quiet from nine.
     lookup = {
-        ("SYNTH-A", 0, 8): _profile(12000, 40, 12000, 60),
-        ("SYNTH-A", 0, 9): _profile(600, 4, 600, 60),
+        ("SYNTH-A", 0, 8): _profile(200, 40, "high", "high"),
+        ("SYNTH-A", 0, 9): _profile(10, 4, "low", "low"),
     }
 
     suggestion = suggest_calmer_departure(

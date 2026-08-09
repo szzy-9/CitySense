@@ -199,12 +199,12 @@ def create_app(test_config=None):
                     "source": refuge_source.lower(),
                     "verified": (
                         all(refuge.get("verified") for refuge in refuge_list)
-                        if refuge_source == "DATABASE" and refuge_list
+                        if refuge_source == "NEON" and refuge_list
                         else False
                     ),
                     "message": (
                         "Check the place when you arrive; conditions change."
-                        if refuge_source == "DATABASE"
+                        if refuge_source == "NEON"
                         else "We picked these places ourselves. Check them when you arrive."
                     ),
                 },
@@ -340,7 +340,7 @@ def create_app(test_config=None):
                         "sensor_location_source", "FALLBACK"
                     ),
                     "historical_profile_source": (
-                        "DATABASE"
+                        "NEON"
                         if any(
                             route["historical_prediction_available"]
                             for route in scored_routes
@@ -348,7 +348,7 @@ def create_app(test_config=None):
                         else "NO_DATA"
                     ),
                     "refuge_source": (
-                        "DATABASE" if database_has_refuges() else "CURATED_PROTOTYPE"
+                        "NEON" if database_has_refuges() else "CURATED_PROTOTYPE"
                     ),
                     "cache_status": pedestrian_snapshot.get("cache_status"),
                     "is_fallback": used_fallback,
