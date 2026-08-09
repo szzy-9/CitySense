@@ -152,6 +152,21 @@ def select_recommended_route(routes):
     )
 
 
+def load_level_for_count(count):
+    """Apply the DS historical per-minute load-band boundaries to a live count."""
+    try:
+        current_count = float(count)
+    except (TypeError, ValueError):
+        return NO_DATA
+    if not math.isfinite(current_count) or current_count < 0:
+        return NO_DATA
+    if current_count < 15:
+        return LOW
+    if current_count <= 40:
+        return MODERATE
+    return HIGH
+
+
 def calculate_confidence(
     route_source,
     pedestrian_source,
@@ -559,9 +574,7 @@ def _public_sensor(sensor):
 
 
 def _sensor_load_level(sensor):
-    """Validate an upstream DS classification without recalculating it."""
-    level = str(sensor.get("sensory_level") or "").strip().upper()
-    return level if level in LOAD_RANK else NO_DATA
+    return load_level_for_count(sensor.get("count"))
 
 
 def _route_data_status(route_source, pedestrian_source, sensory_level):
