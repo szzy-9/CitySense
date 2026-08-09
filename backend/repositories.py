@@ -30,26 +30,14 @@ _TABLE_CACHE = WeakKeyDictionary()
 
 
 def list_active_sensor_locations():
+    """Return CBD sensors without interpreting the DS ``status`` code."""
     try:
         table = _external_table("sensor_location")
-        identifier = _required_column(table, "location_id", "sensor_id", "id")
-        statement = select(table)
-
-        status = _optional_column(table, "status", "sensor_status")
-        is_active = _optional_column(table, "is_active", "active")
-        if status is not None:
-            statement = statement.where(
-                or_(
-                    status.is_(None),
-                    func.lower(cast(status, String)).in_(
-                        ("active", "enabled", "operational")
-                    ),
-                )
-            )
-        elif is_active is not None:
-            statement = statement.where(is_active.is_(True))
-
-        rows = db.session.execute(statement.order_by(identifier)).mappings().all()
+        rows = db.session.execute(
+            select(table)
+            .where(table.c.in_cbd.is_(True))
+            .order_by(table.c.location_id)
+        ).mappings().all()
         return [_sensor_location_dict(row) for row in rows]
     except (SQLAlchemyError, KeyError, TypeError, ValueError):
         safe_rollback()
@@ -62,9 +50,8 @@ def get_sensor_locations_by_ids(location_ids):
         return []
     try:
         table = _external_table("sensor_location")
-        identifier = _required_column(table, "location_id", "sensor_id", "id")
         rows = db.session.execute(
-            select(table).where(cast(identifier, String).in_(identifiers))
+            select(table).where(cast(table.c.location_id, String).in_(identifiers))
         ).mappings().all()
         return [_sensor_location_dict(row) for row in rows]
     except (SQLAlchemyError, KeyError, TypeError, ValueError):
@@ -90,18 +77,16 @@ def get_historical_profiles_for_times(location_ids, target_datetimes):
 
     try:
         table = _external_table("sensor_load_profile")
-        identifier = _required_column(table, "location_id", "sensor_id")
-        day = _required_column(table, "dow")
-        hour = _required_column(table, "hour_of_day")
         time_filter = or_(
             *[
-                (day == day_value) & (hour == hour_value)
+                (table.c.dow == day_value)
+                & (table.c.hour_of_day == hour_value)
                 for day_value, hour_value in time_keys
             ]
         )
         rows = db.session.execute(
             select(table).where(
-                cast(identifier, String).in_(identifiers),
+                cast(table.c.location_id, String).in_(identifiers),
                 time_filter,
             )
         ).mappings().all()
@@ -126,20 +111,16 @@ def get_sensor_thresholds(location_ids):
         return {}
     try:
         table = _external_table("sensor_threshold")
-        identifier = _required_column(table, "location_id", "sensor_id")
         rows = db.session.execute(
-            select(table).where(cast(identifier, String).in_(identifiers))
+            select(table).where(cast(table.c.location_id, String).in_(identifiers))
         ).mappings().all()
         return {
-            str(_required_value(row, "location_id", "sensor_id")): {
-                "p50": _value(row, "p50"),
-                "p80": _value(row, "p80"),
-                "data_version": _value(
-                    row,
-                    "band_version",
-                    "data_version",
-                    "threshold_version",
-                ),
+            str(row["location_id"]): {
+                "p50": _float_or_none(row["p50"]),
+                "p80": _float_or_none(row["p80"]),
+                "first_seen": _iso_value(row["first_seen"]),
+                "last_seen": _iso_value(row["last_seen"]),
+                "completeness": _float_or_none(row["completeness"]),
             }
             for row in rows
         }
@@ -150,9 +131,24 @@ def get_sensor_thresholds(location_ids):
 
 def list_database_refuges():
     try:
-        table = _external_table("refuge")
-        name = _required_column(table, "name", "refuge_name")
-        rows = db.session.execute(select(table).order_by(name)).mappings().all()
+        refuge_table = _external_table("refuge")
+        landmark_table = _external_table("landmark")
+        category_table = _external_table("landmark_category")
+        refuge_with_category = refuge_table.outerjoin(
+            landmark_table,
+            refuge_table.c.landmark_id == landmark_table.c.landmark_id,
+        ).outerjoin(
+            category_table,
+            landmark_table.c.category_id == category_table.c.category_id,
+        )
+        rows = db.session.execute(
+            select(
+                refuge_table,
+                category_table.c.sub_theme.label("_refuge_type"),
+            )
+            .select_from(refuge_with_category)
+            .order_by(refuge_table.c.refuge_name)
+        ).mappings().all()
     except (SQLAlchemyError, KeyError, TypeError, ValueError):
         safe_rollback()
         return []
@@ -252,57 +248,51 @@ def _external_table_has_rows(table_name):
 
 def _sensor_location_dict(row):
     return {
-        "location_id": str(_required_value(row, "location_id", "sensor_id", "id")),
-        "sensor_name": str(
-            _value(
-                row,
-                "sensor_name",
-                "sensor_description",
-                "name",
-                default="Pedestrian sensor",
-            )
-        ),
-        "latitude": float(_required_value(row, "latitude", "lat")),
-        "longitude": float(_required_value(row, "longitude", "lon", "lng")),
-        "location_type": _value(row, "location_type", "sensor_type"),
-        "status": _value(row, "status", "sensor_status"),
-        "data_source": _value(row, "data_source", "source", default="NEON"),
-        "updated_at": _iso_value(
-            _value(row, "updated_at", "last_updated", "last_checked_at")
-        ),
+        "location_id": str(row["location_id"]),
+        "sensor_name": str(row["sensor_name"]),
+        "latitude": float(row["latitude"]),
+        "longitude": float(row["longitude"]),
+        "location_type": row["location_type"],
+        "status": row["status"],
+        "data_source": "NEON",
+        "updated_at": None,
     }
 
 
 def _profile_dict(row):
     return {
-        "location_id": str(_required_value(row, "location_id", "sensor_id")),
-        "day_of_week": int(_required_value(row, "dow")),
-        "hour_of_day": int(_required_value(row, "hour_of_day")),
-        "median_count": _value(row, "median_count"),
-        "median_per_min": _value(row, "median_per_min"),
-        "mean_count": _value(row, "mean_count"),
-        "mean_per_min": _value(row, "mean_per_min"),
-        "std_dev": _value(row, "std_dev"),
-        "sample_count": int(_value(row, "n_obs", default=0) or 0),
-        "load_band": normalize_load_band(_value(row, "load_band")),
-        "confidence": normalize_confidence(_value(row, "confidence")),
-        "data_version": _value(row, "band_version"),
+        "location_id": str(row["location_id"]),
+        "day_of_week": int(row["dow"]),
+        "hour_of_day": int(row["hour_of_day"]),
+        "median_count": _float_or_none(row["median_count"]),
+        "median_per_min": _float_or_none(row["median_per_min"]),
+        "mean_count": _float_or_none(row["mean_count"]),
+        "mean_per_min": _float_or_none(row["mean_per_min"]),
+        "std_dev": _float_or_none(row["std_dev"]),
+        "sample_count": int(row["n_obs"]),
+        "load_band": normalize_load_band(row["load_band"]),
+        "confidence": normalize_confidence(row["confidence"]),
+        "data_version": row["band_version"],
     }
 
 
 def _opening_hours_by_refuge():
     try:
         table = _external_table("refuge_opening_hours")
-        rows = db.session.execute(select(table)).mappings().all()
+        rows = db.session.execute(
+            select(table).order_by(
+                table.c.refuge_id,
+                table.c.dow,
+                table.c.opens_at,
+            )
+        ).mappings().all()
     except (SQLAlchemyError, KeyError, TypeError, ValueError):
         safe_rollback()
         return {}
 
     grouped = defaultdict(list)
     for row in rows:
-        identifier = _value(row, "refuge_id", "id")
-        if identifier is not None:
-            grouped[str(identifier)].append(row)
+        grouped[str(row["refuge_id"])].append(row)
     return {
         identifier: _format_opening_hours(hours)
         for identifier, hours in grouped.items()
@@ -310,104 +300,55 @@ def _opening_hours_by_refuge():
 
 
 def _format_opening_hours(rows):
-    descriptions = []
+    day_labels = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    intervals_by_day = defaultdict(list)
     for row in rows:
-        direct = _value(row, "opening_hours", "hours", "availability")
-        if direct:
-            descriptions.append(str(direct))
+        day = int(row["dow"])
+        if day not in range(7):
             continue
+        intervals_by_day[day].append(
+            f"{_format_time(row['opens_at'])}-{_format_time(row['closes_at'])}"
+        )
 
-        day = _value(row, "day_name", "weekday", "day_of_week", "dow")
-        day_label = str(day) if day is not None else "Daily"
-        if _as_boolean(_value(row, "is_closed", "closed")):
-            descriptions.append(f"{day_label}: closed")
-            continue
-        if _as_boolean(_value(row, "is_24_hours", "open_24_hours")):
-            descriptions.append(f"{day_label}: open 24 hours")
-            continue
-
-        opens = _value(row, "opens_at", "open_time", "opening_time")
-        closes = _value(row, "closes_at", "close_time", "closing_time")
-        if opens is not None or closes is not None:
-            descriptions.append(
-                f"{day_label}: {opens or 'unknown'}-{closes or 'unknown'}"
-            )
-
+    descriptions = [
+        f"{day_labels[day]} {', '.join(intervals_by_day[day])}"
+        for day in sorted(intervals_by_day)
+    ]
     return "; ".join(descriptions) if descriptions else None
 
 
 def _refuge_dict(row, opening_hours):
-    identifier = str(_required_value(row, "refuge_id", "id"))
-    availability = opening_hours.get(identifier) or _value(
-        row,
-        "opening_hours",
-        "availability",
-    )
+    identifier = str(row["refuge_id"])
+    availability = opening_hours.get(identifier)
     return {
         "id": identifier,
-        "name": str(_required_value(row, "name", "refuge_name")),
-        "latitude": float(_required_value(row, "latitude", "lat")),
-        "longitude": float(_required_value(row, "longitude", "lon", "lng")),
-        "refuge_type": str(
-            _value(row, "refuge_type", "type", "category", default="Quiet place")
-        ),
-        "indoor_outdoor": _value(row, "indoor_outdoor", "setting"),
-        "has_seating": _as_boolean(_value(row, "has_seating", "seating")),
-        "is_shaded": _as_boolean(_value(row, "is_shaded", "shaded")),
-        "lighting_level": _value(row, "lighting_level"),
-        "short_description": str(
-            _value(
-                row,
-                "short_description",
-                "description",
-                default="Check local conditions before travelling.",
-            )
-        ),
+        "name": str(row["refuge_name"]),
+        "latitude": float(row["latitude"]),
+        "longitude": float(row["longitude"]),
+        "refuge_type": str(row["_refuge_type"] or "Uncategorised"),
+        "indoor_outdoor": row["indoor_outdoor"],
+        "has_seating": bool(row["has_seating"]),
+        "is_shaded": None,
+        "lighting_level": row["lighting_level"],
+        "step_free": row["step_free"],
+        "short_description": str(row["source_note"] or ""),
         "opening_hours": availability,
         "availability": availability,
-        "verified": _as_boolean(_value(row, "verified")),
-        "data_source": _value(row, "data_source", "source", default="NEON"),
-        "last_checked_at": _iso_value(
-            _value(row, "last_checked_at", "updated_at")
-        ),
+        "verified": True,
+        "data_source": "NEON",
+        "last_checked_at": _iso_value(row["verified_on"]),
     }
-
-
-def _required_column(table, *names):
-    column = _optional_column(table, *names)
-    if column is None:
-        raise KeyError(f"Required column is missing from {table.fullname}")
-    return column
-
-
-def _optional_column(table, *names):
-    for name in names:
-        if name in table.c:
-            return table.c[name]
-    return None
-
-
-def _required_value(row, *names):
-    value = _value(row, *names)
-    if value is None:
-        raise KeyError("Required database value is missing")
-    return value
-
-
-def _value(row, *names, default=None):
-    for name in names:
-        if name in row and row[name] is not None:
-            return row[name]
-    return default
 
 
 def _iso_value(value):
     return value.isoformat() if hasattr(value, "isoformat") else value
 
 
-def _as_boolean(value):
-    if isinstance(value, bool):
-        return value
+def _float_or_none(value):
+    return float(value) if value is not None else None
+
+
+def _format_time(value):
     if value is None:
-        return False
-    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+        return "unknown"
+    return value.strftime("%H:%M") if hasattr(value, "strftime") else str(value)[:5]

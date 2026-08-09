@@ -50,6 +50,24 @@ def test_profile_without_ds_load_band_is_not_independently_classified():
     assert routes[0]["predicted_peak"] == "NO_DATA"
 
 
+def test_invalid_ds_load_band_is_treated_as_no_data():
+    routes = [_route()]
+    departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")
+    lookup = {
+        ("SYNTH-SENSOR-001", 1, 8): _profile(
+            200,
+            40,
+            "busy",
+            "high",
+        ),
+    }
+
+    add_historical_predictions(routes, departure, "LOW", THRESHOLDS, lookup)
+
+    assert routes[0]["historical_prediction_available"] is False
+    assert routes[0]["predicted_peak"] == "NO_DATA"
+
+
 def test_ds_median_per_min_load_band_and_confidence_create_alert():
     routes = [_route()]
     departure, _defaulted = parse_departure_time("2026-08-04T08:00:00+10:00")

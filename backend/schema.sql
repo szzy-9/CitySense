@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS route_searches (
+CREATE TABLE IF NOT EXISTS public.route_searches (
     id BIGSERIAL PRIMARY KEY,
     start_id VARCHAR(80) NOT NULL,
     end_id VARCHAR(80) NOT NULL,
@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS route_searches (
 );
 
 CREATE INDEX IF NOT EXISTS idx_route_searches_created_at
-    ON route_searches (created_at DESC);
+    ON public.route_searches (created_at DESC);
