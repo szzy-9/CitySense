@@ -48,6 +48,22 @@ def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
     return _read_fallback_data()
 
 
+def get_pedestrian_snapshot_for_departure(
+    departure_time,
+    live_mode,
+    use_live=True,
+    timeout=6,
+    client=None,
+):
+    if live_mode:
+        return get_pedestrian_snapshot(
+            use_live=use_live,
+            timeout=timeout,
+            client=client,
+        )
+    return _read_historical_data(departure_time)
+
+
 def _cache_is_current():
     return (
         _live_cache["snapshot"] is not None
@@ -170,6 +186,74 @@ def _read_database_locations():
         }
         for row in list_active_sensor_locations()
     ]
+
+
+def _read_historical_data(departure_time):
+    if not has_app_context():
+        return _empty_historical_snapshot()
+
+    from backend.repositories import (
+        get_historical_profiles,
+        list_active_sensor_locations,
+    )
+
+    locations = list_active_sensor_locations()
+    profiles = get_historical_profiles(
+        [location["location_id"] for location in locations],
+        departure_time,
+    )
+    sensors = []
+    for location in locations:
+        profile = profiles.get(location["location_id"])
+        if not profile:
+            continue
+        try:
+            count = float(profile["median_per_min"])
+        except (KeyError, TypeError, ValueError):
+            count = None
+        if count is not None and count < 0:
+            count = None
+        sensors.append(
+            {
+                "id": location["location_id"],
+                "name": location["sensor_name"],
+                "lat": location["latitude"],
+                "lon": location["longitude"],
+                "count": count,
+                "sensory_level": (
+                    profile["load_band"] if count is not None else "NO_DATA"
+                ),
+                "confidence": profile["confidence"],
+            }
+        )
+
+    return {
+        "source": "historical",
+        "updated_at": None,
+        "sensors": sensors,
+        "readings": [],
+        "message": "Historical crowd profile for the selected departure time",
+        "cache_status": None,
+        "sensor_location_source": "NEON" if locations else "NO_DATA",
+        "count_semantics": (
+            "DS median pedestrians per minute for the selected weekday and hour."
+        ),
+    }
+
+
+def _empty_historical_snapshot():
+    return {
+        "source": "historical",
+        "updated_at": None,
+        "sensors": [],
+        "readings": [],
+        "message": "Historical crowd profile is unavailable",
+        "cache_status": None,
+        "sensor_location_source": "NO_DATA",
+        "count_semantics": (
+            "DS median pedestrians per minute for the selected weekday and hour."
+        ),
+    }
 
 
 def _join_live_rows(count_rows, location_rows):

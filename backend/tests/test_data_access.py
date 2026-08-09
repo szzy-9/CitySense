@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import inspect, text
 
+from backend.app import _departure_uses_live_data
 from backend.models import db
 from backend.repositories import (
     data_table_counts,
@@ -11,7 +12,11 @@ from backend.repositories import (
     list_active_sensor_locations,
     list_database_refuges,
 )
-from backend.services.city_data import COUNTS_URL, get_pedestrian_snapshot
+from backend.services.city_data import (
+    COUNTS_URL,
+    get_pedestrian_snapshot_for_departure,
+)
+from backend.services.scoring import score_routes
 
 
 def test_repository_reads_cbd_sensors_without_interpreting_status(app):
@@ -146,7 +151,8 @@ def test_profile_repository_treats_invalid_ds_labels_conservatively(app):
     assert profile["confidence"] == "LOW"
 
 
-def test_live_counts_use_neon_sensor_locations_when_populated(app):
+def test_current_departure_uses_latest_city_count(app):
+    departure = datetime.fromisoformat("2026-08-06T10:00:00+10:00")
     with app.app_context():
         _create_ds_tables()
         db.session.execute(
@@ -164,7 +170,13 @@ def test_live_counts_use_neon_sensor_locations_when_populated(app):
         db.session.commit()
         fake_client = FakeCityClient()
 
-        snapshot = get_pedestrian_snapshot(
+        snapshot = get_pedestrian_snapshot_for_departure(
+            departure,
+            live_mode=_departure_uses_live_data(
+                departure,
+                defaulted=False,
+                now=datetime.fromisoformat("2026-08-06T00:02:00+00:00"),
+            ),
             use_live=True,
             timeout=1,
             client=fake_client,
@@ -183,6 +195,98 @@ def test_live_counts_use_neon_sensor_locations_when_populated(app):
         }
     ]
     assert fake_client.urls == [COUNTS_URL]
+
+
+def test_non_live_departure_uses_matching_profile_day_and_hour(app):
+    departure = datetime.fromisoformat("2026-08-04T08:15:00+10:00")
+    with app.app_context():
+        _create_ds_tables()
+        db.session.execute(
+            text(
+                """
+                INSERT INTO citysense.sensor_location
+                    (location_id, sensor_description, sensor_name,
+                     location_type, status, latitude, longitude, in_cbd)
+                VALUES
+                    (101, 'Fictional sensor A', 'SYNTH-A', 'Outdoor',
+                     'A', -37.81, 144.96, 1)
+                """
+            )
+        )
+        db.session.execute(
+            text(
+                """
+                INSERT INTO citysense.sensor_load_profile
+                    (location_id, dow, hour_of_day, median_count, median_per_min,
+                     mean_count, mean_per_min, std_dev, n_obs, load_band,
+                     confidence, band_version)
+                VALUES
+                    (101, 1, 8, 150, 2.5, 160, 2.7, 20, 40,
+                     'moderate', 'high', 'DS_V1'),
+                    (101, 1, 9, 60, 1.0, 70, 1.2, 10, 30,
+                     'low', 'medium', 'DS_V1')
+                """
+            )
+        )
+        db.session.commit()
+
+        snapshot = get_pedestrian_snapshot_for_departure(
+            departure,
+            live_mode=False,
+        )
+
+    assert snapshot["source"] == "historical"
+    assert snapshot["sensors"] == [
+        {
+            "id": "101",
+            "name": "SYNTH-A",
+            "lat": -37.81,
+            "lon": 144.96,
+            "count": 2.5,
+            "sensory_level": "MODERATE",
+            "confidence": "HIGH",
+        }
+    ]
+
+
+def test_historical_profile_load_band_is_used_directly():
+    snapshot = {
+        "source": "historical",
+        "updated_at": None,
+        "sensors": [
+            {
+                "id": "101",
+                "name": "SYNTH-A",
+                "lat": -37.81,
+                "lon": 144.96,
+                "count": 2.5,
+                "sensory_level": "MODERATE",
+                "confidence": "HIGH",
+            }
+        ],
+    }
+    route = {
+        "id": "route-1",
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [[144.959, -37.81], [144.961, -37.81]],
+        },
+        "distance_meters": 200,
+        "duration_minutes": 3,
+        "source": "LIVE",
+        "fallback_reason": None,
+        "steps": [],
+    }
+
+    routes, _fastest, _calmest, _recommended = score_routes(
+        [route],
+        snapshot,
+        route_source="live",
+    )
+
+    # A live count of 2.5 would be LOW. MODERATE proves the stored DS band won.
+    assert routes[0]["sensory_level"] == "MODERATE"
+    assert routes[0]["matched_sensors"][0]["confidence"] == "HIGH"
 
 
 def test_missing_live_count_is_not_normalised_to_zero_or_low():

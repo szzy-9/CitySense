@@ -376,9 +376,10 @@ def route_sensory_indicator(
         peak_load == NO_DATA
         or coverage < MIN_CLASSIFICATION_COVERAGE
         or route_source != "live"
-        or pedestrian_source != "live"
-        or not _is_fresh(updated_at, now)
+        or pedestrian_source not in {"live", "historical"}
     ):
+        return NO_DATA
+    if pedestrian_source == "live" and not _is_fresh(updated_at, now):
         return NO_DATA
 
     if LOAD_RANK[peak_load] <= TOLERANCE_MAX_RANK[crowd_tolerance]:
@@ -563,7 +564,7 @@ def _sample_route(coordinates):
 
 
 def _public_sensor(sensor):
-    return {
+    public_sensor = {
         "id": str(sensor["id"]),
         "name": sensor["name"],
         "lat": sensor["lat"],
@@ -571,15 +572,23 @@ def _public_sensor(sensor):
         "count": sensor["count"],
         "sensory_level": _sensor_load_level(sensor),
     }
+    if sensor.get("confidence"):
+        public_sensor["confidence"] = sensor["confidence"]
+    return public_sensor
 
 
 def _sensor_load_level(sensor):
+    if "sensory_level" in sensor:
+        level = str(sensor.get("sensory_level") or "").strip().upper()
+        return level if level in LOAD_RANK else NO_DATA
     return load_level_for_count(sensor.get("count"))
 
 
 def _route_data_status(route_source, pedestrian_source, sensory_level):
     if route_source != "live":
         return "PROTOTYPE"
+    if pedestrian_source == "historical":
+        return "HISTORICAL"
     if pedestrian_source != "live":
         return "FALLBACK"
     if sensory_level == NO_DATA:

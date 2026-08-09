@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -9,7 +11,10 @@ from backend.repositories import (
     data_table_counts,
     database_has_refuges,
 )
-from backend.services.city_data import get_pedestrian_snapshot
+from backend.services.city_data import (
+    get_pedestrian_snapshot,
+    get_pedestrian_snapshot_for_departure,
+)
 from backend.services.geocoding import (
     MAX_AUTOCOMPLETE_RESULTS,
     autocomplete_locations,
@@ -32,6 +37,7 @@ from backend.services.scoring import monitor_route, score_routes
 
 
 ALLOWED_CROWD_TOLERANCE = {"LOW", "MEDIUM", "HIGH"}
+LIVE_DEPARTURE_WINDOW_SECONDS = 5 * 60
 
 
 def create_app(test_config=None):
@@ -235,7 +241,12 @@ def create_app(test_config=None):
         if locations_are_same(start, end):
             return _error("Start and destination must be different.", 400)
 
-        pedestrian_snapshot = get_pedestrian_snapshot(
+        pedestrian_snapshot = get_pedestrian_snapshot_for_departure(
+            departure_time,
+            live_mode=_departure_uses_live_data(
+                departure_time,
+                departure_time_defaulted,
+            ),
             use_live=app.config["USE_LIVE_CITY_DATA"],
             timeout=app.config["REQUEST_TIMEOUT_SECONDS"],
         )
@@ -393,6 +404,19 @@ def _unique_route_sensors(routes):
         for sensor in route.get("matched_sensors", []):
             sensors[sensor["id"]] = sensor
     return list(sensors.values())
+
+
+def _departure_uses_live_data(departure_time, defaulted, now=None):
+    if defaulted:
+        return True
+    current_time = now or datetime.now(timezone.utc)
+    difference = abs(
+        (
+            departure_time.astimezone(timezone.utc)
+            - current_time.astimezone(timezone.utc)
+        ).total_seconds()
+    )
+    return difference <= LIVE_DEPARTURE_WINDOW_SECONDS
 
 
 def _prediction_thresholds(config):
