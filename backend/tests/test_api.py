@@ -333,13 +333,12 @@ def test_route_monitor_uses_pedestrian_data_without_requesting_new_route(
                 {
                     "id": "sensor-1",
                     "name": "Test sensor",
-                        "lat": -37.81,
-                        "lon": 144.965,
-                        "count": 700,
-                        "p50_hourly": 3000,
-                        "p80_hourly": 9000,
-                    }
-                ],
+                    "lat": -37.81,
+                    "lon": 144.965,
+                    "count": 700,
+                    "sensory_level": "HIGH",
+                }
+            ],
         },
     )
 

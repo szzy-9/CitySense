@@ -6,7 +6,6 @@ from backend.services.scoring import (
     MODERATE,
     NO_DATA,
     calculate_confidence,
-    load_level_for_count,
     monitor_route,
     route_sensory_indicator,
     score_routes,
@@ -33,32 +32,28 @@ def test_no_data_is_not_treated_as_low():
     assert worst_load_level([NO_DATA, MODERATE]) == MODERATE
 
 
-def test_load_band_boundaries_are_explicit():
-    # Live people/minute is converted to an hourly-equivalent pace before it
-    # is compared with this sensor's DS hourly p50/p80 values.
-    assert load_level_for_count(None, 3000, 9000) == NO_DATA
-    assert load_level_for_count(50, 3000, 9000) == LOW
-    assert load_level_for_count(51, 3000, 9000) == MODERATE
-    assert load_level_for_count(150, 3000, 9000) == MODERATE
-    assert load_level_for_count(151, 3000, 9000) == HIGH
+def test_raw_live_count_is_not_reclassified_in_flask():
+    scored, _, _, _ = score_routes(
+        [_route("route-1", -37.81, 15)],
+        _snapshot([_sensor("raw", -37.81, 700)]),
+        route_source="live",
+    )
+
+    assert scored[0]["matched_sensor_count"] == 1
+    assert scored[0]["matched_sensors"][0]["sensory_level"] == NO_DATA
+    assert scored[0]["sensory_level"] == NO_DATA
+    assert scored[0]["coverage"] == 0
 
 
-def test_live_minute_count_is_compared_as_an_hourly_equivalent_pace():
-    # 10 people in the latest minute is compared as a 600 people/hour pace.
-    assert load_level_for_count(10, 600, 1200) == LOW
-    assert load_level_for_count(10, 599, 1200) == MODERATE
-    assert load_level_for_count(10, 300, 599) == HIGH
+def test_ds_classified_sensor_band_is_used_without_recalculation():
+    scored, _, _, _ = score_routes(
+        [_route("route-1", -37.81, 15)],
+        _snapshot([_sensor("classified", -37.81, 700, sensory_level=LOW)]),
+        route_source="live",
+    )
 
-
-def test_same_live_count_uses_each_sensor_own_thresholds():
-    assert load_level_for_count(10, 600, 1200) == LOW
-    assert load_level_for_count(10, 300, 500) == HIGH
-
-
-def test_missing_or_invalid_sensor_threshold_is_no_data():
-    assert load_level_for_count(10) == NO_DATA
-    assert load_level_for_count(10, 600, None) == NO_DATA
-    assert load_level_for_count(10, 900, 600) == NO_DATA
+    assert scored[0]["matched_sensors"][0]["sensory_level"] == LOW
+    assert scored[0]["sensory_level"] == LOW
 
 
 def test_route_without_reliable_segments_returns_no_data():
@@ -209,8 +204,8 @@ def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():
         _route("calm", -37.8140, 14),
     ]
     sensors = [
-        _sensor("high", -37.8100, 700),
-        _sensor("low", -37.8140, 30),
+        _sensor("high", -37.8100, 700, sensory_level=HIGH),
+        _sensor("low", -37.8140, 30, sensory_level=LOW),
     ]
 
     scored, fastest_id, calmest_id, recommended_id = score_routes(
@@ -231,45 +226,10 @@ def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():
     ] == LOW
 
 
-def test_segment_and_route_use_worst_sensor_specific_band():
-    sensors = [
-        _sensor("locally-low", -37.81, 10, p50_hourly=600, p80_hourly=1200),
-        _sensor("locally-high", -37.81, 10, p50_hourly=300, p80_hourly=500),
-    ]
-
-    scored, _, _, _ = score_routes(
-        [_route("route", -37.81, 10)],
-        _snapshot(sensors),
-        route_source="live",
-    )
-
-    assert scored[0]["segments"][0]["sensory_level"] == HIGH
-    assert scored[0]["sensory_level"] == HIGH
-    assert scored[0]["crowd_score"] == 10
-
-
-def test_matched_sensor_without_threshold_does_not_become_low():
-    sensor = _sensor("missing-threshold", -37.81, 10)
-    sensor.pop("p50_hourly")
-    sensor.pop("p80_hourly")
-
-    scored, _, _, _ = score_routes(
-        [_route("route", -37.81, 10)],
-        _snapshot([sensor]),
-        route_source="live",
-    )
-
-    assert scored[0]["matched_sensor_count"] == 1
-    assert scored[0]["classified_sensor_count"] == 0
-    assert scored[0]["segments"][0]["sensory_level"] == NO_DATA
-    assert scored[0]["sensory_level"] == NO_DATA
-    assert scored[0]["coverage"] == 0
-
-
 def test_monitor_reports_first_threshold_breach_with_live_data():
     result = monitor_route(
         _route("route", -37.81, 10)["geometry"]["coordinates"],
-        _snapshot([_sensor("high", -37.81, 700)]),
+        _snapshot([_sensor("high", -37.81, 700, sensory_level=HIGH)]),
         "MEDIUM",
     )
 
@@ -279,7 +239,7 @@ def test_monitor_reports_first_threshold_breach_with_live_data():
 
 
 def test_monitor_never_alerts_from_fallback_data():
-    snapshot = _snapshot([_sensor("high", -37.81, 700)])
+    snapshot = _snapshot([_sensor("high", -37.81, 700, sensory_level=HIGH)])
     snapshot["source"] = "fallback"
 
     result = monitor_route(
@@ -312,7 +272,7 @@ def test_every_route_is_labelled_so_the_comparison_never_collapses():
             _route("route-2", -37.8300, 14),
             _route("route-3", -37.8500, 16),
         ],
-        _snapshot([_sensor("s1", -37.8100, 40)]),
+        _snapshot([_sensor("s1", -37.8100, 40, sensory_level=LOW)]),
         route_source="live",
     )
 
@@ -344,23 +304,17 @@ def _route(route_id, latitude, duration):
     }
 
 
-def _sensor(
-    sensor_id,
-    latitude,
-    count,
-    lon=144.9625,
-    p50_hourly=3000,
-    p80_hourly=9000,
-):
-    return {
+def _sensor(sensor_id, latitude, count, lon=144.9625, sensory_level=None):
+    sensor = {
         "id": sensor_id,
         "name": f"Sensor {sensor_id}",
         "lat": latitude,
         "lon": lon,
         "count": count,
-        "p50_hourly": p50_hourly,
-        "p80_hourly": p80_hourly,
     }
+    if sensory_level is not None:
+        sensor["sensory_level"] = sensory_level
+    return sensor
 
 
 def _snapshot(sensors):
@@ -399,8 +353,8 @@ def test_peak_separates_the_doorstep_from_the_stretch_a_route_can_choose():
     scored, _, _, _ = score_routes(
         [_long_route("route-1", -37.8100)],
         _snapshot([
-            _sensor("origin", -37.8100, 200, lon=144.9600),
-            _sensor("middle", -37.8100, 20, lon=144.9700),
+            _sensor("origin", -37.8100, 200, lon=144.9600, sensory_level=HIGH),
+            _sensor("middle", -37.8100, 20, lon=144.9700, sensory_level=LOW),
         ]),
         route_source="live",
     )
@@ -418,10 +372,10 @@ def test_calmest_compares_the_avoidable_stretch_not_the_shared_doorstep():
     # middle of the trip tells them apart.
     routes = [_long_route("loud", -37.8100), _long_route("quiet", -37.8140)]
     sensors = [
-        _sensor("origin-loud", -37.8100, 200, lon=144.9600),
-        _sensor("origin-quiet", -37.8140, 200, lon=144.9600),
-        _sensor("middle-loud", -37.8100, 200, lon=144.9700),
-        _sensor("middle-quiet", -37.8140, 20, lon=144.9700),
+        _sensor("origin-loud", -37.8100, 200, lon=144.9600, sensory_level=HIGH),
+        _sensor("origin-quiet", -37.8140, 200, lon=144.9600, sensory_level=HIGH),
+        _sensor("middle-loud", -37.8100, 200, lon=144.9700, sensory_level=HIGH),
+        _sensor("middle-quiet", -37.8140, 20, lon=144.9700, sensory_level=LOW),
     ]
 
     scored, _, calmest_id, _ = score_routes(routes, _snapshot(sensors), route_source="live")

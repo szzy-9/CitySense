@@ -257,7 +257,7 @@ test("failed reroute preserves the current route result", () => {
 test("sensory indicator has explicit text for low, high, and no data", () => {
   assert.equal(formatSensoryIndicator("LOW"), "Within your crowd limit");
   assert.equal(formatSensoryIndicator("HIGH"), "Above your crowd limit");
-  assert.equal(formatSensoryIndicator("NO_DATA"), "Not enough data");
+  assert.equal(formatSensoryIndicator("NO_DATA"), "Not enough reliable data");
   assert.notEqual(formatSensoryIndicator("NO_DATA"), formatSensoryIndicator("LOW"));
 });
 
