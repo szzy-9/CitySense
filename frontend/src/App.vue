@@ -791,13 +791,28 @@ function dismissMonitorAlert() {
   pendingAlternative.value = null;
 }
 
+/*
+ * One coordinate per press meant 36 presses to reach the first busy stretch of
+ * a real CBD route, which is why nobody checked the crowd warnings by walking
+ * one. A tenth of the route per press covers the same ground in ten.
+ */
+const SIMULATOR_STEPS_PER_ROUTE = 10;
+
 function simulateAlongRoute() {
   const coordinates = selectedRoute.value?.geometry?.coordinates || [];
   if (!coordinates.length) {
     return;
   }
-  simulatorIndex = Math.min(simulatorIndex + 1, coordinates.length - 1);
-  setSimulatedPosition(coordinates[simulatorIndex], "Simulated movement along route.");
+  const step = Math.max(
+    1,
+    Math.round((coordinates.length - 1) / SIMULATOR_STEPS_PER_ROUTE),
+  );
+  simulatorIndex = Math.min(simulatorIndex + step, coordinates.length - 1);
+  const share = Math.round((simulatorIndex / (coordinates.length - 1)) * 100);
+  setSimulatedPosition(
+    coordinates[simulatorIndex],
+    `Simulated movement along route, ${share}% of the way.`,
+  );
 }
 
 function simulateOffRoute() {
