@@ -13,6 +13,7 @@ const INDICATOR_LABELS = {
 
 const DATA_STATUS_LABELS = {
   LIVE: "Live data",
+  HISTORICAL: "Historical data",
   FALLBACK: "Sample data",
   PROTOTYPE: "Example route",
   NO_DATA: "No data",
@@ -98,6 +99,9 @@ export function describeUnavoidablePeak(route) {
 
   const near = `${formatLoadLevel(unavoidable)} near the start and end, which no route avoids.`;
   if (!LOAD_RANK[avoidable]) {
+    if (unavoidable === "LOW") {
+      return "Low crowd levels were detected near the start and end. The remaining sections have limited crowd-data coverage.";
+    }
     return `${near} We have no crowd data for the rest of it.`;
   }
   return `${near} Nothing above ${formatLoadLevel(avoidable).toLowerCase()} in between.`;

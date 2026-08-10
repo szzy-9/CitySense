@@ -7,7 +7,7 @@ from backend.services.locations import haversine_distance
 
 def get_refuges(origin=None):
     database_refuges = list_database_refuges()
-    source = "DATABASE" if database_refuges else "CURATED_PROTOTYPE"
+    source = "NEON" if database_refuges else "CURATED_PROTOTYPE"
     source_refuges = database_refuges or REFUGES
     refuges = [
         _with_distance(refuge, origin) if origin else dict(refuge)

@@ -152,20 +152,17 @@ def select_recommended_route(routes):
     )
 
 
-# People per minute past a sensor, the unit the City of Melbourne per-minute
-# feed reports and the one the Iteration 1 methodology is written against.
-# These thresholds were previously 200 and 500, which no reading in that unit
-# ever reaches: every street classified Low, and the bands carried no meaning.
-LOW_MAX_PER_MINUTE = 50
-MODERATE_MAX_PER_MINUTE = 150
-
-
 def load_level_for_count(count):
-    if count is None:
+    """Apply the DS historical per-minute load-band boundaries to a live count."""
+    try:
+        current_count = float(count)
+    except (TypeError, ValueError):
         return NO_DATA
-    if count <= LOW_MAX_PER_MINUTE:
+    if not math.isfinite(current_count) or current_count < 0:
+        return NO_DATA
+    if current_count < 15:
         return LOW
-    if count <= MODERATE_MAX_PER_MINUTE:
+    if current_count <= 40:
         return MODERATE
     return HIGH
 
@@ -213,7 +210,7 @@ def confidence_reasons(
     if pedestrian_source != "live":
         reasons.append("Showing sample crowd counts, not today's.")
     if sensory_level == NO_DATA:
-        reasons.append("No sensors are reporting near this route.")
+        reasons.append("No DS-classified current load is available for this route.")
     if not _is_fresh(updated_at, now):
         reasons.append("The latest crowd counts are over an hour old.")
     if sensor_count < MIN_HIGH_CONFIDENCE_SENSORS:
@@ -277,9 +274,23 @@ def _score_route(
         else 0
     )
 
-    counts = [sensor["count"] for sensor in public_sensors]
+    classified_sensors = [
+        sensor for sensor in public_sensors if sensor["sensory_level"] in LOAD_RANK
+    ]
+    counts = [sensor["count"] for sensor in classified_sensors]
     average_load = round(sum(counts) / len(counts)) if counts else None
-    peak_sensor = max(public_sensors, key=lambda sensor: sensor["count"], default=None)
+    peak_level = worst_load_level(
+        [sensor["sensory_level"] for sensor in classified_sensors]
+    )
+    peak_sensor = max(
+        (
+            sensor
+            for sensor in classified_sensors
+            if sensor["sensory_level"] == peak_level
+        ),
+        key=lambda sensor: sensor["count"],
+        default=None,
+    )
     peak_count = peak_sensor["count"] if peak_sensor else None
     peak_location = (
         peak_sensor["name"]
@@ -365,9 +376,10 @@ def route_sensory_indicator(
         peak_load == NO_DATA
         or coverage < MIN_CLASSIFICATION_COVERAGE
         or route_source != "live"
-        or pedestrian_source != "live"
-        or not _is_fresh(updated_at, now)
+        or pedestrian_source not in {"live", "historical"}
     ):
+        return NO_DATA
+    if pedestrian_source == "live" and not _is_fresh(updated_at, now):
         return NO_DATA
 
     if LOAD_RANK[peak_load] <= TOLERANCE_MAX_RANK[crowd_tolerance]:
@@ -418,7 +430,7 @@ def monitor_route(
             "You can switch to a calmer route."
         )
     elif upcoming_peak == NO_DATA:
-        message = "No sensors are reporting on the road ahead."
+        message = "No DS-classified current load is available for the road ahead."
     else:
         message = "The road ahead stays within your crowd limit."
 
@@ -446,7 +458,21 @@ def _build_route_segments(coordinates, sensors):
 
     for index, segment_coordinates in enumerate(coordinate_groups, start=1):
         matched = _match_sensors(segment_coordinates, sensors)
-        peak_sensor = max(matched, key=lambda sensor: sensor["count"], default=None)
+        classified = [
+            sensor for sensor in matched if _sensor_load_level(sensor) in LOAD_RANK
+        ]
+        sensory_level = worst_load_level(
+            [_sensor_load_level(sensor) for sensor in classified]
+        )
+        peak_sensor = max(
+            (
+                sensor
+                for sensor in classified
+                if _sensor_load_level(sensor) == sensory_level
+            ),
+            key=lambda sensor: sensor["count"],
+            default=None,
+        )
         peak_count = peak_sensor["count"] if peak_sensor else None
 
         segments.append(
@@ -456,7 +482,7 @@ def _build_route_segments(coordinates, sensors):
                     "type": "LineString",
                     "coordinates": segment_coordinates,
                 },
-                "sensory_level": load_level_for_count(peak_count),
+                "sensory_level": sensory_level,
                 "sensor_count": len(matched),
                 "peak_count": peak_count,
                 "_matched_sensors": matched,
@@ -538,19 +564,31 @@ def _sample_route(coordinates):
 
 
 def _public_sensor(sensor):
-    return {
+    public_sensor = {
         "id": str(sensor["id"]),
         "name": sensor["name"],
         "lat": sensor["lat"],
         "lon": sensor["lon"],
         "count": sensor["count"],
-        "sensory_level": load_level_for_count(sensor["count"]),
+        "sensory_level": _sensor_load_level(sensor),
     }
+    if sensor.get("confidence"):
+        public_sensor["confidence"] = sensor["confidence"]
+    return public_sensor
+
+
+def _sensor_load_level(sensor):
+    if "sensory_level" in sensor:
+        level = str(sensor.get("sensory_level") or "").strip().upper()
+        return level if level in LOAD_RANK else NO_DATA
+    return load_level_for_count(sensor.get("count"))
 
 
 def _route_data_status(route_source, pedestrian_source, sensory_level):
     if route_source != "live":
         return "PROTOTYPE"
+    if pedestrian_source == "historical":
+        return "HISTORICAL"
     if pedestrian_source != "live":
         return "FALLBACK"
     if sensory_level == NO_DATA:
@@ -560,7 +598,7 @@ def _route_data_status(route_source, pedestrian_source, sensory_level):
 
 def _route_explanation(sensory_level, peak_location, segments):
     if sensory_level == NO_DATA:
-        return "No sensors are reporting along this route right now."
+        return "No DS-classified current load is available along this route."
 
     level = _level_label(sensory_level)
     if peak_location:

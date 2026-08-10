@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy.engine import make_url
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -21,18 +21,6 @@ def read_database_url():
     url = os.getenv("DATABASE_URL", "").strip()
 
     if not url:
-        rds_host = os.getenv("RDS_HOSTNAME", "").strip()
-        if rds_host:
-            ssl_mode = os.getenv("RDS_SSLMODE", "require").strip()
-            return URL.create(
-                "postgresql+psycopg",
-                username=os.getenv("RDS_USERNAME", ""),
-                password=os.getenv("RDS_PASSWORD", ""),
-                host=rds_host,
-                port=int(os.getenv("RDS_PORT", "5432")),
-                database=os.getenv("RDS_DB_NAME", "citysense"),
-                query={"sslmode": ssl_mode} if ssl_mode else {},
-            )
         return f"sqlite:///{default_path}"
 
     if url == "sqlite:///citysense.db":

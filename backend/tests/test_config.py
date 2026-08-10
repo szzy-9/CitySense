@@ -16,7 +16,7 @@ def test_standard_postgresql_url_uses_installed_psycopg_driver(monkeypatch):
     assert url.query["sslmode"] == "require"
 
 
-def test_rds_settings_require_ssl_by_default(monkeypatch):
+def test_postgresql_is_not_built_from_legacy_rds_variables(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "")
     monkeypatch.setenv("RDS_HOSTNAME", "database.example")
     monkeypatch.setenv("RDS_USERNAME", "citysense")
@@ -24,9 +24,8 @@ def test_rds_settings_require_ssl_by_default(monkeypatch):
 
     url = read_database_url()
 
-    assert isinstance(url, URL)
-    assert url.drivername == "postgresql+psycopg"
-    assert url.query["sslmode"] == "require"
+    assert isinstance(url, str)
+    assert url.startswith("sqlite:///")
 
 
 def test_neon_url_keeps_ssl_and_uses_small_resilient_pool(monkeypatch):

@@ -33,13 +33,11 @@ def test_no_data_is_not_treated_as_low():
     assert worst_load_level([NO_DATA, MODERATE]) == MODERATE
 
 
-def test_load_band_boundaries_are_explicit():
-    # People per minute, the unit the live feed reports.
-    assert load_level_for_count(None) == NO_DATA
-    assert load_level_for_count(50) == LOW
-    assert load_level_for_count(51) == MODERATE
-    assert load_level_for_count(150) == MODERATE
-    assert load_level_for_count(151) == HIGH
+def test_live_count_boundaries_match_verified_ds_rule():
+    assert load_level_for_count(14) == LOW
+    assert load_level_for_count(15) == MODERATE
+    assert load_level_for_count(40) == MODERATE
+    assert load_level_for_count(41) == HIGH
 
 
 def test_route_without_reliable_segments_returns_no_data():
@@ -191,7 +189,7 @@ def test_fastest_high_and_calmest_low_recommends_calmest_for_low_tolerance():
     ]
     sensors = [
         _sensor("high", -37.8100, 700),
-        _sensor("low", -37.8140, 30),
+        _sensor("low", -37.8140, 14),
     ]
 
     scored, fastest_id, calmest_id, recommended_id = score_routes(
@@ -337,7 +335,7 @@ def test_peak_separates_the_doorstep_from_the_stretch_a_route_can_choose():
         [_long_route("route-1", -37.8100)],
         _snapshot([
             _sensor("origin", -37.8100, 200, lon=144.9600),
-            _sensor("middle", -37.8100, 20, lon=144.9700),
+            _sensor("middle", -37.8100, 14, lon=144.9700),
         ]),
         route_source="live",
     )
@@ -358,7 +356,7 @@ def test_calmest_compares_the_avoidable_stretch_not_the_shared_doorstep():
         _sensor("origin-loud", -37.8100, 200, lon=144.9600),
         _sensor("origin-quiet", -37.8140, 200, lon=144.9600),
         _sensor("middle-loud", -37.8100, 200, lon=144.9700),
-        _sensor("middle-quiet", -37.8140, 20, lon=144.9700),
+        _sensor("middle-quiet", -37.8140, 14, lon=144.9700),
     ]
 
     scored, _, calmest_id, _ = score_routes(routes, _snapshot(sensors), route_source="live")

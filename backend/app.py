@@ -1,16 +1,20 @@
+from datetime import datetime, timezone
+
 import httpx
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from backend.config import Config, ROOT_DIR
-from backend.database import database_health, initialize_database
+from backend.database import database_health
 from backend.models import db
 from backend.repositories import (
     data_table_counts,
     database_has_refuges,
-    record_route_search,
 )
-from backend.services.city_data import get_pedestrian_snapshot
+from backend.services.city_data import (
+    get_pedestrian_snapshot,
+    get_pedestrian_snapshot_for_departure,
+)
 from backend.services.geocoding import (
     MAX_AUTOCOMPLETE_RESULTS,
     autocomplete_locations,
@@ -33,6 +37,7 @@ from backend.services.scoring import monitor_route, score_routes
 
 
 ALLOWED_CROWD_TOLERANCE = {"LOW", "MEDIUM", "HIGH"}
+LIVE_DEPARTURE_WINDOW_SECONDS = 5 * 60
 
 
 def create_app(test_config=None):
@@ -54,10 +59,6 @@ def create_app(test_config=None):
         resources={r"/api/*": {"origins": allowed_origins}},
         methods=["GET", "POST", "OPTIONS"],
     )
-
-    with app.app_context():
-        if not initialize_database():
-            app.logger.warning("Database schema initialization is deferred")
 
     @app.after_request
     def add_security_headers(response):
@@ -199,12 +200,12 @@ def create_app(test_config=None):
                     "source": refuge_source.lower(),
                     "verified": (
                         all(refuge.get("verified") for refuge in refuge_list)
-                        if refuge_source == "DATABASE" and refuge_list
+                        if refuge_source == "NEON" and refuge_list
                         else False
                     ),
                     "message": (
                         "Check the place when you arrive; conditions change."
-                        if refuge_source == "DATABASE"
+                        if refuge_source == "NEON"
                         else "We picked these places ourselves. Check them when you arrive."
                     ),
                 },
@@ -240,7 +241,12 @@ def create_app(test_config=None):
         if locations_are_same(start, end):
             return _error("Start and destination must be different.", 400)
 
-        pedestrian_snapshot = get_pedestrian_snapshot(
+        pedestrian_snapshot = get_pedestrian_snapshot_for_departure(
+            departure_time,
+            live_mode=_departure_uses_live_data(
+                departure_time,
+                departure_time_defaulted,
+            ),
             use_live=app.config["USE_LIVE_CITY_DATA"],
             timeout=app.config["REQUEST_TIMEOUT_SECONDS"],
         )
@@ -279,30 +285,6 @@ def create_app(test_config=None):
             crowd_tolerance,
             _prediction_thresholds(app.config),
         )
-        if not record_route_search(
-            {
-                "start_source": start["source"],
-                "end_source": end["source"],
-                "fastest_route_id": fastest_id,
-                "calmest_route_id": calmest_id,
-                "route_source": route_source,
-                "pedestrian_source": pedestrian_snapshot["source"],
-                "selected_route_type": "RECOMMENDED",
-                "confidence": selected_route.get("confidence"),
-                "route_count": len(scored_routes),
-                "used_historical_prediction": selected_route[
-                    "historical_prediction_available"
-                ],
-                "prediction_confidence": (
-                    selected_route["prediction_confidence"]
-                    if selected_route["historical_prediction_available"]
-                    else None
-                ),
-            }
-        ):
-            app.logger.warning("Database route search commit failed")
-            return _error("The database is temporarily unavailable.", 503)
-
         used_fallback = (
             route_source == "fallback"
             or pedestrian_snapshot["source"] == "fallback"
@@ -340,7 +322,7 @@ def create_app(test_config=None):
                         "sensor_location_source", "FALLBACK"
                     ),
                     "historical_profile_source": (
-                        "DATABASE"
+                        "NEON"
                         if any(
                             route["historical_prediction_available"]
                             for route in scored_routes
@@ -348,7 +330,7 @@ def create_app(test_config=None):
                         else "NO_DATA"
                     ),
                     "refuge_source": (
-                        "DATABASE" if database_has_refuges() else "CURATED_PROTOTYPE"
+                        "NEON" if database_has_refuges() else "CURATED_PROTOTYPE"
                     ),
                     "cache_status": pedestrian_snapshot.get("cache_status"),
                     "is_fallback": used_fallback,
@@ -422,6 +404,19 @@ def _unique_route_sensors(routes):
         for sensor in route.get("matched_sensors", []):
             sensors[sensor["id"]] = sensor
     return list(sensors.values())
+
+
+def _departure_uses_live_data(departure_time, defaulted, now=None):
+    if defaulted:
+        return True
+    current_time = now or datetime.now(timezone.utc)
+    difference = abs(
+        (
+            departure_time.astimezone(timezone.utc)
+            - current_time.astimezone(timezone.utc)
+        ).total_seconds()
+    )
+    return difference <= LIVE_DEPARTURE_WINDOW_SECONDS
 
 
 def _prediction_thresholds(config):
