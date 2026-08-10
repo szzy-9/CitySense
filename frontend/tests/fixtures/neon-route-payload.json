@@ -1,0 +1,1306 @@
+{
+  "data_status": {
+    "cache_status": "live",
+    "fallback_reason": null,
+    "historical_profile_source": "NEON",
+    "is_fallback": false,
+    "pedestrian_message": "Live City of Melbourne pedestrian data",
+    "pedestrian_source": "live",
+    "refuge_source": "CURATED_PROTOTYPE",
+    "route_message": "OpenRouteService walking routes",
+    "route_source": "live",
+    "sensor_count": 67,
+    "sensor_location_source": "NEON",
+    "updated_at": "2026-08-10T09:04:00+00:00"
+  },
+  "departure_suggestion": null,
+  "end": {
+    "label": "Melbourne Museum",
+    "lat": -37.8033,
+    "lon": 144.9717,
+    "source": "autocomplete"
+  },
+  "recommended_route_id": "route-1",
+  "request_settings": {
+    "applied_to_routing": true,
+    "crowd_tolerance": "LOW",
+    "departure_time": "2026-08-10T19:31:34.491245+10:00",
+    "departure_time_defaulted": true,
+    "message": "The selected crowd tolerance affects the default recommendation."
+  },
+  "routes": [
+    {
+      "average_load": 29,
+      "avoidable_level": "HIGH",
+      "confidence": "HIGH",
+      "confidence_explanation": "Based on live counts from 21 sensors along this route.",
+      "confidence_reasons": [],
+      "congestion_avoidable": false,
+      "coverage": 0.75,
+      "crowd_label": "High",
+      "crowd_score": 132,
+      "data_status": "LIVE",
+      "distance_meters": 2151,
+      "duration_minutes": 25.8,
+      "explanation": "Busiest near Elizabeth St - Flinders St (East) - New footpath, where it reaches High.",
+      "fallback_reason": null,
+      "geometry": {
+        "coordinates": [
+          [
+            144.967102,
+            -37.818304
+          ],
+          [
+            144.967216,
+            -37.818272
+          ],
+          [
+            144.967173,
+            -37.818184
+          ],
+          [
+            144.967151,
+            -37.818139
+          ],
+          [
+            144.967134,
+            -37.818102
+          ],
+          [
+            144.967122,
+            -37.818076
+          ],
+          [
+            144.967109,
+            -37.818046
+          ],
+          [
+            144.967092,
+            -37.818004
+          ],
+          [
+            144.96708,
+            -37.81797
+          ],
+          [
+            144.967179,
+            -37.81776
+          ],
+          [
+            144.967196,
+            -37.817726
+          ],
+          [
+            144.967243,
+            -37.817642
+          ],
+          [
+            144.967242,
+            -37.817627
+          ],
+          [
+            144.967241,
+            -37.817604
+          ],
+          [
+            144.967239,
+            -37.817541
+          ],
+          [
+            144.967237,
+            -37.817468
+          ],
+          [
+            144.967227,
+            -37.817401
+          ],
+          [
+            144.967261,
+            -37.817347
+          ],
+          [
+            144.967101,
+            -37.816994
+          ],
+          [
+            144.966942,
+            -37.816644
+          ],
+          [
+            144.966902,
+            -37.816557
+          ],
+          [
+            144.966875,
+            -37.816543
+          ],
+          [
+            144.966866,
+            -37.816522
+          ],
+          [
+            144.966859,
+            -37.816506
+          ],
+          [
+            144.96685,
+            -37.816485
+          ],
+          [
+            144.966844,
+            -37.816471
+          ],
+          [
+            144.966849,
+            -37.816445
+          ],
+          [
+            144.966798,
+            -37.816337
+          ],
+          [
+            144.966571,
+            -37.81583
+          ],
+          [
+            144.966548,
+            -37.815781
+          ],
+          [
+            144.966486,
+            -37.815645
+          ],
+          [
+            144.966527,
+            -37.815633
+          ],
+          [
+            144.966574,
+            -37.815619
+          ],
+          [
+            144.966624,
+            -37.815604
+          ],
+          [
+            144.966661,
+            -37.815593
+          ],
+          [
+            144.966705,
+            -37.81558
+          ],
+          [
+            144.966715,
+            -37.81556
+          ],
+          [
+            144.966722,
+            -37.815545
+          ],
+          [
+            144.966714,
+            -37.815527
+          ],
+          [
+            144.966706,
+            -37.815508
+          ],
+          [
+            144.966652,
+            -37.81539
+          ],
+          [
+            144.966641,
+            -37.815367
+          ],
+          [
+            144.966623,
+            -37.815344
+          ],
+          [
+            144.966373,
+            -37.814848
+          ],
+          [
+            144.966227,
+            -37.814523
+          ],
+          [
+            144.966238,
+            -37.814497
+          ],
+          [
+            144.966233,
+            -37.814486
+          ],
+          [
+            144.966225,
+            -37.81447
+          ],
+          [
+            144.966219,
+            -37.814457
+          ],
+          [
+            144.966211,
+            -37.81444
+          ],
+          [
+            144.966177,
+            -37.814421
+          ],
+          [
+            144.965794,
+            -37.813587
+          ],
+          [
+            144.965761,
+            -37.813517
+          ],
+          [
+            144.965747,
+            -37.813488
+          ],
+          [
+            144.965735,
+            -37.813461
+          ],
+          [
+            144.965702,
+            -37.813389
+          ],
+          [
+            144.965657,
+            -37.813289
+          ],
+          [
+            144.965611,
+            -37.81319
+          ],
+          [
+            144.965649,
+            -37.813178
+          ],
+          [
+            144.965854,
+            -37.813118
+          ],
+          [
+            144.965952,
+            -37.812887
+          ],
+          [
+            144.966124,
+            -37.812835
+          ],
+          [
+            144.965906,
+            -37.812372
+          ],
+          [
+            144.965902,
+            -37.812362
+          ],
+          [
+            144.965891,
+            -37.812337
+          ],
+          [
+            144.966411,
+            -37.81218
+          ],
+          [
+            144.966465,
+            -37.812164
+          ],
+          [
+            144.96666,
+            -37.812108
+          ],
+          [
+            144.966833,
+            -37.812056
+          ],
+          [
+            144.966864,
+            -37.812047
+          ],
+          [
+            144.966955,
+            -37.812019
+          ],
+          [
+            144.967077,
+            -37.811983
+          ],
+          [
+            144.967219,
+            -37.81194
+          ],
+          [
+            144.967271,
+            -37.811924
+          ],
+          [
+            144.967508,
+            -37.811851
+          ],
+          [
+            144.9675,
+            -37.811834
+          ],
+          [
+            144.967496,
+            -37.811824
+          ],
+          [
+            144.967487,
+            -37.811806
+          ],
+          [
+            144.967112,
+            -37.810993
+          ],
+          [
+            144.967083,
+            -37.810927
+          ],
+          [
+            144.967039,
+            -37.810829
+          ],
+          [
+            144.967007,
+            -37.810756
+          ],
+          [
+            144.96683,
+            -37.810375
+          ],
+          [
+            144.966735,
+            -37.810171
+          ],
+          [
+            144.966667,
+            -37.810025
+          ],
+          [
+            144.966739,
+            -37.809988
+          ],
+          [
+            144.966844,
+            -37.809861
+          ],
+          [
+            144.966905,
+            -37.809843
+          ],
+          [
+            144.967168,
+            -37.809764
+          ],
+          [
+            144.967153,
+            -37.809732
+          ],
+          [
+            144.967141,
+            -37.809706
+          ],
+          [
+            144.966779,
+            -37.808868
+          ],
+          [
+            144.968006,
+            -37.808502
+          ],
+          [
+            144.968684,
+            -37.808295
+          ],
+          [
+            144.96866,
+            -37.808245
+          ],
+          [
+            144.968602,
+            -37.80812
+          ],
+          [
+            144.968582,
+            -37.808077
+          ],
+          [
+            144.968672,
+            -37.808031
+          ],
+          [
+            144.968788,
+            -37.807998
+          ],
+          [
+            144.968868,
+            -37.807977
+          ],
+          [
+            144.968906,
+            -37.807749
+          ],
+          [
+            144.968957,
+            -37.807424
+          ],
+          [
+            144.96897,
+            -37.807356
+          ],
+          [
+            144.968986,
+            -37.807258
+          ],
+          [
+            144.968994,
+            -37.807186
+          ],
+          [
+            144.969231,
+            -37.807022
+          ],
+          [
+            144.969337,
+            -37.806844
+          ],
+          [
+            144.96936,
+            -37.806761
+          ],
+          [
+            144.969357,
+            -37.80657
+          ],
+          [
+            144.969353,
+            -37.80635
+          ],
+          [
+            144.969377,
+            -37.806263
+          ],
+          [
+            144.969588,
+            -37.805796
+          ],
+          [
+            144.969628,
+            -37.805432
+          ],
+          [
+            144.969596,
+            -37.805264
+          ],
+          [
+            144.96961,
+            -37.804952
+          ],
+          [
+            144.96966,
+            -37.804745
+          ],
+          [
+            144.969755,
+            -37.804553
+          ],
+          [
+            144.969853,
+            -37.804563
+          ],
+          [
+            144.969879,
+            -37.804496
+          ],
+          [
+            144.96993,
+            -37.804439
+          ],
+          [
+            144.970001,
+            -37.804398
+          ],
+          [
+            144.970085,
+            -37.804376
+          ],
+          [
+            144.970185,
+            -37.804373
+          ],
+          [
+            144.97029,
+            -37.803715
+          ],
+          [
+            144.971607,
+            -37.803854
+          ]
+        ],
+        "type": "LineString"
+      },
+      "historical_prediction_available": true,
+      "id": "route-1",
+      "last_updated": "2026-08-10T09:04:00+00:00",
+      "matched_sensor_count": 21,
+      "peak_load": "HIGH",
+      "peak_location": "Elizabeth St - Flinders St (East) - New footpath",
+      "pedestrian_source": "live",
+      "predicted_count": 26,
+      "predicted_peak": "MODERATE",
+      "prediction_alert": null,
+      "prediction_basis": "Based on the same weekday and hour in past weeks",
+      "prediction_confidence": "LOW",
+      "prediction_coverage": 0.75,
+      "prediction_unavailable_reason": "We only have past patterns for part of this route.",
+      "recommendation_reason": "This route goes above your crowd limit.",
+      "recommended": true,
+      "roles": [
+        "Fastest",
+        "Calmest",
+        "Recommended"
+      ],
+      "route_source": "live",
+      "segments": [
+        {
+          "estimated_arrival_time": "2026-08-10T19:32:49.954039+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.967102,
+                -37.818304
+              ],
+              [
+                144.967216,
+                -37.818272
+              ],
+              [
+                144.967173,
+                -37.818184
+              ],
+              [
+                144.967151,
+                -37.818139
+              ],
+              [
+                144.967134,
+                -37.818102
+              ],
+              [
+                144.967122,
+                -37.818076
+              ],
+              [
+                144.967109,
+                -37.818046
+              ],
+              [
+                144.967092,
+                -37.818004
+              ],
+              [
+                144.96708,
+                -37.81797
+              ],
+              [
+                144.967179,
+                -37.81776
+              ],
+              [
+                144.967196,
+                -37.817726
+              ],
+              [
+                144.967243,
+                -37.817642
+              ],
+              [
+                144.967242,
+                -37.817627
+              ],
+              [
+                144.967241,
+                -37.817604
+              ],
+              [
+                144.967239,
+                -37.817541
+              ],
+              [
+                144.967237,
+                -37.817468
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-1",
+          "near_endpoint": true,
+          "peak_count": 132,
+          "predicted_band": "MODERATE",
+          "predicted_count": 26,
+          "predicted_for": "2026-08-10T19:32:49.954039+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "MEDIUM",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 1.3,
+          "prediction_sample_count": 104,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 11,
+          "sensor_count": 11,
+          "sensory_level": "HIGH"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:35:28.382210+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.967237,
+                -37.817468
+              ],
+              [
+                144.967227,
+                -37.817401
+              ],
+              [
+                144.967261,
+                -37.817347
+              ],
+              [
+                144.967101,
+                -37.816994
+              ],
+              [
+                144.966942,
+                -37.816644
+              ],
+              [
+                144.966902,
+                -37.816557
+              ],
+              [
+                144.966875,
+                -37.816543
+              ],
+              [
+                144.966866,
+                -37.816522
+              ],
+              [
+                144.966859,
+                -37.816506
+              ],
+              [
+                144.96685,
+                -37.816485
+              ],
+              [
+                144.966844,
+                -37.816471
+              ],
+              [
+                144.966849,
+                -37.816445
+              ],
+              [
+                144.966798,
+                -37.816337
+              ],
+              [
+                144.966571,
+                -37.81583
+              ],
+              [
+                144.966548,
+                -37.815781
+              ],
+              [
+                144.966486,
+                -37.815645
+              ],
+              [
+                144.966527,
+                -37.815633
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-2",
+          "near_endpoint": true,
+          "peak_count": 113,
+          "predicted_band": "MODERATE",
+          "predicted_count": 26,
+          "predicted_for": "2026-08-10T19:35:28.382210+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "MEDIUM",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 3.9,
+          "prediction_sample_count": 104,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 10,
+          "sensor_count": 10,
+          "sensory_level": "HIGH"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:37:14.177185+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.966527,
+                -37.815633
+              ],
+              [
+                144.966574,
+                -37.815619
+              ],
+              [
+                144.966624,
+                -37.815604
+              ],
+              [
+                144.966661,
+                -37.815593
+              ],
+              [
+                144.966705,
+                -37.81558
+              ],
+              [
+                144.966715,
+                -37.81556
+              ],
+              [
+                144.966722,
+                -37.815545
+              ],
+              [
+                144.966714,
+                -37.815527
+              ],
+              [
+                144.966706,
+                -37.815508
+              ],
+              [
+                144.966652,
+                -37.81539
+              ],
+              [
+                144.966641,
+                -37.815367
+              ],
+              [
+                144.966623,
+                -37.815344
+              ],
+              [
+                144.966373,
+                -37.814848
+              ],
+              [
+                144.966227,
+                -37.814523
+              ],
+              [
+                144.966238,
+                -37.814497
+              ],
+              [
+                144.966233,
+                -37.814486
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-3",
+          "near_endpoint": false,
+          "peak_count": 113,
+          "predicted_band": "MODERATE",
+          "predicted_count": 26,
+          "predicted_for": "2026-08-10T19:37:14.177185+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "MEDIUM",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 5.7,
+          "prediction_sample_count": 104,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 10,
+          "sensor_count": 10,
+          "sensory_level": "HIGH"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:40:32.667461+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.966233,
+                -37.814486
+              ],
+              [
+                144.966225,
+                -37.81447
+              ],
+              [
+                144.966219,
+                -37.814457
+              ],
+              [
+                144.966211,
+                -37.81444
+              ],
+              [
+                144.966177,
+                -37.814421
+              ],
+              [
+                144.965794,
+                -37.813587
+              ],
+              [
+                144.965761,
+                -37.813517
+              ],
+              [
+                144.965747,
+                -37.813488
+              ],
+              [
+                144.965735,
+                -37.813461
+              ],
+              [
+                144.965702,
+                -37.813389
+              ],
+              [
+                144.965657,
+                -37.813289
+              ],
+              [
+                144.965611,
+                -37.81319
+              ],
+              [
+                144.965649,
+                -37.813178
+              ],
+              [
+                144.965854,
+                -37.813118
+              ],
+              [
+                144.965952,
+                -37.812887
+              ],
+              [
+                144.966124,
+                -37.812835
+              ],
+              [
+                144.965906,
+                -37.812372
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-4",
+          "near_endpoint": false,
+          "peak_count": 113,
+          "predicted_band": "MODERATE",
+          "predicted_count": 26,
+          "predicted_for": "2026-08-10T19:40:32.667461+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "MEDIUM",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 9.0,
+          "prediction_sample_count": 104,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 9,
+          "sensor_count": 9,
+          "sensory_level": "HIGH"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:42:28.864061+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.965906,
+                -37.812372
+              ],
+              [
+                144.965902,
+                -37.812362
+              ],
+              [
+                144.965891,
+                -37.812337
+              ],
+              [
+                144.966411,
+                -37.81218
+              ],
+              [
+                144.966465,
+                -37.812164
+              ],
+              [
+                144.96666,
+                -37.812108
+              ],
+              [
+                144.966833,
+                -37.812056
+              ],
+              [
+                144.966864,
+                -37.812047
+              ],
+              [
+                144.966955,
+                -37.812019
+              ],
+              [
+                144.967077,
+                -37.811983
+              ],
+              [
+                144.967219,
+                -37.81194
+              ],
+              [
+                144.967271,
+                -37.811924
+              ],
+              [
+                144.967508,
+                -37.811851
+              ],
+              [
+                144.9675,
+                -37.811834
+              ],
+              [
+                144.967496,
+                -37.811824
+              ],
+              [
+                144.967487,
+                -37.811806
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-5",
+          "near_endpoint": false,
+          "peak_count": 34,
+          "predicted_band": "MODERATE",
+          "predicted_count": 16,
+          "predicted_for": "2026-08-10T19:42:28.864061+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "MEDIUM",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 10.9,
+          "prediction_sample_count": 103,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 7,
+          "sensor_count": 7,
+          "sensory_level": "MODERATE"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:49:04.750069+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.967487,
+                -37.811806
+              ],
+              [
+                144.967112,
+                -37.810993
+              ],
+              [
+                144.967083,
+                -37.810927
+              ],
+              [
+                144.967039,
+                -37.810829
+              ],
+              [
+                144.967007,
+                -37.810756
+              ],
+              [
+                144.96683,
+                -37.810375
+              ],
+              [
+                144.966735,
+                -37.810171
+              ],
+              [
+                144.966667,
+                -37.810025
+              ],
+              [
+                144.966739,
+                -37.809988
+              ],
+              [
+                144.966844,
+                -37.809861
+              ],
+              [
+                144.966905,
+                -37.809843
+              ],
+              [
+                144.967168,
+                -37.809764
+              ],
+              [
+                144.967153,
+                -37.809732
+              ],
+              [
+                144.967141,
+                -37.809706
+              ],
+              [
+                144.966779,
+                -37.808868
+              ],
+              [
+                144.968006,
+                -37.808502
+              ],
+              [
+                144.968684,
+                -37.808295
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": true,
+          "id": "segment-6",
+          "near_endpoint": false,
+          "peak_count": 34,
+          "predicted_band": "LOW",
+          "predicted_count": 10,
+          "predicted_for": "2026-08-10T19:49:04.750069+10:00",
+          "prediction_basis": "Based on the same weekday and hour in past weeks",
+          "prediction_confidence": "HIGH",
+          "prediction_data_version": "1.2.0",
+          "prediction_lead_minutes": 17.5,
+          "prediction_sample_count": 105,
+          "prediction_unavailable_reason": null,
+          "profile_sensor_count": 3,
+          "sensor_count": 3,
+          "sensory_level": "MODERATE"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:51:44.830692+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.968684,
+                -37.808295
+              ],
+              [
+                144.96866,
+                -37.808245
+              ],
+              [
+                144.968602,
+                -37.80812
+              ],
+              [
+                144.968582,
+                -37.808077
+              ],
+              [
+                144.968672,
+                -37.808031
+              ],
+              [
+                144.968788,
+                -37.807998
+              ],
+              [
+                144.968868,
+                -37.807977
+              ],
+              [
+                144.968906,
+                -37.807749
+              ],
+              [
+                144.968957,
+                -37.807424
+              ],
+              [
+                144.96897,
+                -37.807356
+              ],
+              [
+                144.968986,
+                -37.807258
+              ],
+              [
+                144.968994,
+                -37.807186
+              ],
+              [
+                144.969231,
+                -37.807022
+              ],
+              [
+                144.969337,
+                -37.806844
+              ],
+              [
+                144.96936,
+                -37.806761
+              ],
+              [
+                144.969357,
+                -37.80657
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": false,
+          "id": "segment-7",
+          "near_endpoint": false,
+          "peak_count": null,
+          "predicted_band": "NO_DATA",
+          "predicted_count": null,
+          "predicted_for": "2026-08-10T19:51:44.830692+10:00",
+          "prediction_basis": null,
+          "prediction_confidence": "LOW",
+          "prediction_lead_minutes": 20.2,
+          "prediction_unavailable_reason": "No past pattern for this stretch at this time of day.",
+          "profile_sensor_count": 0,
+          "sensor_count": 0,
+          "sensory_level": "NO_DATA"
+        },
+        {
+          "estimated_arrival_time": "2026-08-10T19:57:22.491245+10:00",
+          "geometry": {
+            "coordinates": [
+              [
+                144.969357,
+                -37.80657
+              ],
+              [
+                144.969353,
+                -37.80635
+              ],
+              [
+                144.969377,
+                -37.806263
+              ],
+              [
+                144.969588,
+                -37.805796
+              ],
+              [
+                144.969628,
+                -37.805432
+              ],
+              [
+                144.969596,
+                -37.805264
+              ],
+              [
+                144.96961,
+                -37.804952
+              ],
+              [
+                144.96966,
+                -37.804745
+              ],
+              [
+                144.969755,
+                -37.804553
+              ],
+              [
+                144.969853,
+                -37.804563
+              ],
+              [
+                144.969879,
+                -37.804496
+              ],
+              [
+                144.96993,
+                -37.804439
+              ],
+              [
+                144.970001,
+                -37.804398
+              ],
+              [
+                144.970085,
+                -37.804376
+              ],
+              [
+                144.970185,
+                -37.804373
+              ],
+              [
+                144.97029,
+                -37.803715
+              ],
+              [
+                144.971607,
+                -37.803854
+              ]
+            ],
+            "type": "LineString"
+          },
+          "historical_prediction_available": false,
+          "id": "segment-8",
+          "near_endpoint": true,
+          "peak_count": null,
+          "predicted_band": "NO_DATA",
+          "predicted_count": null,
+          "predicted_for": "2026-08-10T19:57:22.491245+10:00",
+          "prediction_basis": null,
+          "prediction_confidence": "LOW",
+          "prediction_lead_minutes": 25.8,
+          "prediction_unavailable_reason": "No past pattern for this stretch at this time of day.",
+          "profile_sensor_count": 0,
+          "sensor_count": 0,
+          "sensory_level": "NO_DATA"
+        }
+      ],
+      "sensor_count": 21,
+      "sensory_indicator": "HIGH",
+      "sensory_level": "HIGH",
+      "source": "LIVE",
+      "unavoidable_level": "HIGH"
+    }
+  ],
+  "sensors": [],
+  "start": {
+    "label": "Current Location",
+    "lat": -37.8183,
+    "lon": 144.9671,
+    "source": "current_location"
+  }
+}

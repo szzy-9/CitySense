@@ -4,7 +4,7 @@ import httpx
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-from backend.config import Config, ROOT_DIR
+from backend.config import Config, ROOT_DIR, read_engine_options
 from backend.database import database_health
 from backend.models import db
 from backend.repositories import (
@@ -46,6 +46,13 @@ def create_app(test_config=None):
 
     if test_config:
         app.config.update(test_config)
+        # Pool settings are read from the environment's database at import time.
+        # A caller that overrides the URI gets a different backend, and handing
+        # SQLite a Postgres pool size fails before a single test runs.
+        if "SQLALCHEMY_ENGINE_OPTIONS" not in test_config:
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = read_engine_options(
+                app.config["SQLALCHEMY_DATABASE_URI"]
+            )
 
     db.init_app(app)
 

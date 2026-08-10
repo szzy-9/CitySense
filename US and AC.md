@@ -100,3 +100,29 @@ Given a user is viewing the list of nearby refuges
 When the user looks at any individual result
 
 Then the system shows that refuge's type and its distance or walking time from where the user currently is, so the user can judge which one they can actually reach.
+
+# User Story 2.2: Predictive overwhelm alerts
+User story: As a sensory-sensitive commuter, I want a predictive alert before an area is likely to become overwhelming within the next hour, so I can adjust my plan proactively.
+
+Data source: Historical pedestrian patterns and hourly trends.
+
+Benefit: Rerouting before reaching high-stimulation zones.
+
+Definition of Done:
+- Fire alerts ahead of time before zone entry
+- Prediction accuracy tested against held-out data
+- Code reviewed and merged
+
+## AC 2.2a - Alert triggers from historical trend data
+Given a user is walking toward an area that historical pedestrian trends predict will become overwhelming within the next hour
+
+When the system generates that prediction
+
+Then it sends the user an alert before they reach the area.
+
+## AC 2.2b - Alert arrives with enough lead time to act
+Given the system has generated an overwhelm alert for an area the user is approaching
+
+When the alert is delivered
+
+Then the user receives it with enough lead time before entering the zone to change direction or delay their trip, rather than receiving it after they have already arrived.

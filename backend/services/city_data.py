@@ -180,7 +180,7 @@ def _read_database_locations():
     return [
         {
             "location_id": row["location_id"],
-            "sensor_description": row["sensor_name"],
+            "sensor_description": row["sensor_description"],
             "latitude": row["latitude"],
             "longitude": row["longitude"],
         }
@@ -216,7 +216,7 @@ def _read_historical_data(departure_time):
         sensors.append(
             {
                 "id": location["location_id"],
-                "name": location["sensor_name"],
+                "name": location["sensor_description"],
                 "lat": location["latitude"],
                 "lon": location["longitude"],
                 "count": count,
