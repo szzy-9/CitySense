@@ -33,6 +33,32 @@ const LOAD_RANK = {
   HIGH: 3,
 };
 
+const CONFIDENCE_RANK = {
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+};
+
+// Mirrors TOLERANCE_MAX_RANK in backend/services/scoring.py: the busiest band a
+// walker on each setting still counts as within their limit.
+const TOLERANCE_MAX_RANK = {
+  LOW: LOAD_RANK.LOW,
+  MEDIUM: LOAD_RANK.MODERATE,
+  HIGH: LOAD_RANK.HIGH,
+};
+
+// A warning the walker cannot act on is noise, so nothing is raised inside the
+// last few minutes before a stretch. An alert already on screen is exempt: it
+// keeps counting down, because vanishing at four minutes to go would pull the
+// warning exactly when it matters most.
+export const MIN_ALERT_LEAD_MINUTES = 5;
+// "within the next hour", from the user story. Past that the historical pattern
+// belongs to an hour the walker has not reached yet.
+export const MAX_ALERT_LEAD_MINUTES = 60;
+// Mirrors the PREDICTION_MIN_ALERT_CONFIDENCE default. A thin or erratic
+// profile describes the past too loosely to interrupt someone over.
+const ALERT_MIN_CONFIDENCE_RANK = CONFIDENCE_RANK.MEDIUM;
+
 export function formatLoadLevel(level) {
   return LOAD_LABELS[level] || "No Data";
 }
@@ -312,6 +338,203 @@ export function compareObservedPeaks(previousRoute, nextRoute) {
     return "There is a calmer way to go.";
   }
   return "Nothing calmer nearby. This is the calmest option we found.";
+}
+
+/*
+ * The stretches of a scored route the walker has not entered yet, and how many
+ * minutes away each one is from where they are standing now.
+ *
+ * A stretch the walker is already inside does not count as ahead of them. Once
+ * they are in it there is nothing left to warn about in advance, and live
+ * counts describe where they are standing better than a past pattern can.
+ *
+ * Segment boundaries are read as distance fractions rather than by repeating
+ * the backend's coordinate-splitting arithmetic here. That arithmetic is free
+ * to change, and a copy of it in the browser would drift without failing.
+ */
+export function segmentsAheadOfLocation(route, location) {
+  const segments = route?.segments || [];
+  if (!segments.length) {
+    return [];
+  }
+
+  const lengths = segments.map((segment) =>
+    lineDistance(segment.geometry?.coordinates || []),
+  );
+  const totalDistance = lengths.reduce((total, length) => total + length, 0);
+  if (!totalDistance) {
+    return [];
+  }
+
+  // Without a position the walker is treated as still at the start, so the
+  // whole route is ahead of them.
+  const remainingDistance = isConfirmedLocation(location)
+    ? remainingRouteDistance(location, route.geometry)
+    : totalDistance;
+  const travelledDistance = Math.max(0, totalDistance - remainingDistance);
+  const durationMinutes = Number(route.duration_minutes) || 0;
+
+  const ahead = [];
+  let segmentStart = 0;
+  segments.forEach((segment, index) => {
+    const segmentEnd = segmentStart + lengths[index];
+    if (segmentStart >= travelledDistance) {
+      ahead.push({
+        segment,
+        index,
+        etaMinutes: Math.max(
+          0,
+          ((segmentStart - travelledDistance) / totalDistance) * durationMinutes,
+        ),
+      });
+    }
+    segmentStart = segmentEnd;
+  });
+  return ahead;
+}
+
+/*
+ * The predicted-crowding warning for the stretch the walker is heading into.
+ *
+ * The backend states each segment's historical outlook once, against the hour
+ * it expected the walker to arrive. Recomputing which segment is still ahead,
+ * and how far off it is, keeps that outlook tied to where the walker actually
+ * is: the warning arrives before the stretch and stops the moment it is behind
+ * them, instead of sitting on screen for a corner already walked past.
+ */
+export function selectPredictiveAlert(
+  route,
+  location,
+  crowdTolerance,
+  { now = Date.now(), raisedSignature = "" } = {},
+) {
+  // Example routes are not claimed as forecasts, matching the backend's own
+  // refusal to raise an alert off one.
+  if (!route || route.route_source !== "live") {
+    return null;
+  }
+
+  const thresholdRank = TOLERANCE_MAX_RANK[crowdTolerance] || TOLERANCE_MAX_RANK.MEDIUM;
+  const candidate = segmentsAheadOfLocation(route, location).find((item) => {
+    const { segment, etaMinutes } = item;
+    if (!segment.historical_prediction_available) {
+      return false;
+    }
+    if ((LOAD_RANK[segment.predicted_band] || 0) <= thresholdRank) {
+      return false;
+    }
+    if (
+      (CONFIDENCE_RANK[segment.prediction_confidence] || 0) < ALERT_MIN_CONFIDENCE_RANK
+    ) {
+      return false;
+    }
+    if (etaMinutes > MAX_ALERT_LEAD_MINUTES) {
+      return false;
+    }
+    // Rounding to nothing would read as "likely moderate in about 0 minutes",
+    // which is a description of where the walker already is, not a warning.
+    if (Math.round(etaMinutes) < 1) {
+      return false;
+    }
+    return (
+      etaMinutes >= MIN_ALERT_LEAD_MINUTES ||
+      segmentSignature(item.index, segment.predicted_band) === raisedSignature
+    );
+  });
+
+  if (!candidate) {
+    return null;
+  }
+
+  const leadMinutes = Math.round(candidate.etaMinutes);
+  const drift = patternHourDrift(
+    candidate.segment.predicted_for,
+    now,
+    candidate.etaMinutes,
+  );
+  return {
+    predicted_condition: candidate.segment.predicted_band,
+    segment_index: candidate.index,
+    lead_minutes: leadMinutes,
+    confidence: candidate.segment.prediction_confidence,
+    reroute_available: true,
+    source: "position",
+    pattern_hour_drift: Boolean(drift),
+    message: predictiveAlertMessage(
+      candidate.segment.predicted_band,
+      leadMinutes,
+      drift,
+    ),
+  };
+}
+
+export function predictiveAlertSignature(alert) {
+  if (!alert) {
+    return "";
+  }
+  return segmentSignature(alert.segment_index, alert.predicted_condition);
+}
+
+export function shouldShowPredictiveAlert(alert, dismissedSignature) {
+  const signature = predictiveAlertSignature(alert);
+  return Boolean(signature && signature !== dismissedSignature);
+}
+
+function segmentSignature(index, band) {
+  return `${index}:${band}`;
+}
+
+function predictiveAlertMessage(band, leadMinutes, drift) {
+  const level = formatLoadLevel(band).toLowerCase();
+  const minutes = leadMinutes === 1 ? "about a minute" : `about ${leadMinutes} minutes`;
+  if (!drift) {
+    return `Likely ${level} in ${minutes}, based on past weeks.`;
+  }
+  // Saying "likely high" off the wrong hour's pattern would be a claim we
+  // cannot stand behind, so the mismatch is named instead of hidden.
+  return (
+    `Likely ${level} in ${minutes}. This reads the ${drift.patternLabel} pattern, ` +
+    `but you are now due there around ${drift.arrivalLabel}, so check another route ` +
+    "for a fresh outlook."
+  );
+}
+
+/*
+ * Whether the walker will reach a stretch in a different hour from the one its
+ * outlook was calculated for. Historical profiles are held per weekday and
+ * hour, so a trip that slips past the hour mark is being described by a pattern
+ * that no longer covers it.
+ */
+function patternHourDrift(predictedFor, now, etaMinutes) {
+  // new Date(null) is the epoch rather than an invalid date, which would report
+  // every outlook as read off the wrong hour.
+  if (typeof predictedFor !== "string" || !predictedFor) {
+    return null;
+  }
+  const pattern = new Date(predictedFor);
+  if (Number.isNaN(pattern.getTime())) {
+    return null;
+  }
+
+  const arrival = new Date(Number(now) + etaMinutes * 60_000);
+  if (Number.isNaN(arrival.getTime())) {
+    return null;
+  }
+  if (
+    pattern.getHours() === arrival.getHours() &&
+    pattern.getDay() === arrival.getDay()
+  ) {
+    return null;
+  }
+  return {
+    patternLabel: formatHourLabel(pattern),
+    arrivalLabel: formatHourLabel(arrival),
+  };
+}
+
+function formatHourLabel(date) {
+  const hour = date.getHours();
+  return `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? "am" : "pm"}`;
 }
 
 export function monitorAlertSignature(response) {

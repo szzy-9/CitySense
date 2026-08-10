@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import BandIcon from "./components/BandIcon.vue";
 import DataStatus from "./components/DataStatus.vue";
@@ -23,15 +23,19 @@ import {
   buildCalmestComparison,
   canStartReroute,
   compareObservedPeaks,
+  formatConfidence,
   formatLoadLevel,
   formatRouteRoles,
   isConfirmedLocation,
   isOffRoute,
   monitorAlertSignature,
   navigationSummary,
+  predictiveAlertSignature,
   preserveCurrentRouteResult,
   remainingRouteCoordinates,
+  selectPredictiveAlert,
   shouldShowMonitorAlert,
+  shouldShowPredictiveAlert,
   selectRouteDeparture,
   toDateTimeLocalValue,
 } from "./routeDisplay.js";
@@ -64,6 +68,11 @@ const positionMessage = ref("");
 const rerouteMessage = ref("");
 const rerouteTiming = ref(null);
 const monitorAlert = ref(null);
+const dismissedPredictiveSignature = ref("");
+const raisedPredictiveSignature = ref("");
+// A walker who has stopped moving sends no position updates, so the countdown
+// on a predicted-crowding warning needs a clock of its own to stay honest.
+const navigationClock = ref(Date.now());
 const pendingAlternative = ref(null);
 const alternativeLoading = ref(false);
 const showLocationSimulator = import.meta.env.DEV;
@@ -166,6 +175,38 @@ const navigation = computed(() => {
     arrivalDistanceMetres,
   );
 });
+
+/*
+ * The historical outlook for the stretch the walker is heading into, read
+ * against where they are now rather than where they set off from. The backend
+ * states each stretch's outlook once, at planning time; recomputing which
+ * stretch is still ahead is what keeps the warning ahead of the walker and
+ * takes it down once the stretch is behind them.
+ */
+const predictiveAlert = computed(() => {
+  const alert = selectPredictiveAlert(
+    selectedRoute.value,
+    currentLocation.value,
+    crowdTolerance.value,
+    {
+      now: navigationClock.value,
+      raisedSignature: raisedPredictiveSignature.value,
+    },
+  );
+  return shouldShowPredictiveAlert(alert, dismissedPredictiveSignature.value)
+    ? alert
+    : null;
+});
+
+// A warning already on screen is allowed to keep counting down inside the last
+// few minutes, so this records which one is showing.
+watch(predictiveAlert, (alert) => {
+  raisedPredictiveSignature.value = predictiveAlertSignature(alert);
+});
+
+function dismissPredictiveAlert() {
+  dismissedPredictiveSignature.value = predictiveAlertSignature(predictiveAlert.value);
+}
 
 const canFindRoutes = computed(() => {
   return (
@@ -340,6 +381,7 @@ async function requestRoutes(options = {}) {
     lastMonitorAlertSignature = "";
     alternativePreparedForSignature = "";
     monitorAlert.value = null;
+    dismissedPredictiveSignature.value = "";
     pendingAlternative.value = null;
     if (originOverride) {
       startLocation.value = requestOrigin;
@@ -605,8 +647,12 @@ async function stopLocationTracking() {
 
 function startRouteMonitoring() {
   stopRouteMonitoring();
+  navigationClock.value = Date.now();
   monitorActiveRoute();
-  monitoringIntervalId = window.setInterval(monitorActiveRoute, 60_000);
+  monitoringIntervalId = window.setInterval(() => {
+    navigationClock.value = Date.now();
+    void monitorActiveRoute();
+  }, 60_000);
 }
 
 function stopRouteMonitoring() {
@@ -737,6 +783,7 @@ function usePreparedAlternative() {
   monitorAlert.value = null;
   lastMonitorAlertSignature = "";
   alternativePreparedForSignature = "";
+  dismissedPredictiveSignature.value = "";
 }
 
 function dismissMonitorAlert() {
@@ -1086,16 +1133,16 @@ function readPositionAccuracy(position) {
         </section>
 
         <section
-          v-if="selectedRoute?.prediction_alert"
+          v-if="predictiveAlert"
           class="panel banner banner-warn"
           role="alert"
           data-testid="prediction-alert"
         >
           <span class="banner-icon" aria-hidden="true">◷</span>
           <p class="screen-label">Historical outlook</p>
-          <p class="panel-title">{{ selectedRoute.prediction_alert.message }}</p>
+          <p class="panel-title">{{ predictiveAlert.message }}</p>
           <p class="panel-body">
-            {{ selectedRoute.prediction_alert.confidence }} confidence · based on an imported
+            {{ formatConfidence(predictiveAlert.confidence) }} · based on an imported
             historical baseline, not a live forecast.
           </p>
           <p v-if="!currentLocation" class="panel-body">
@@ -1109,6 +1156,9 @@ function readPositionAccuracy(position) {
               @click="rerouteFromCurrentLocation('prediction')"
             >
               Check another route
+            </button>
+            <button type="button" class="text-button" @click="dismissPredictiveAlert">
+              Keep current route
             </button>
           </div>
         </section>

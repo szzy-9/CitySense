@@ -18,12 +18,16 @@ import {
   monitorAlertSignature,
   navigationSummary,
   nextFollowMode,
+  predictiveAlertSignature,
   preserveCurrentRouteResult,
   remainingRouteCoordinates,
   remainingRouteDistance,
+  segmentsAheadOfLocation,
   selectCurrentRouteStep,
+  selectPredictiveAlert,
   selectRouteDeparture,
   shouldShowMonitorAlert,
+  shouldShowPredictiveAlert,
   toTimezoneAwareDeparture,
 } from "../src/routeDisplay.js";
 import { UserFacingError, messageForError } from "../src/userMessages.js";
@@ -335,4 +339,166 @@ test("the doorstep is reported apart from the stretch a route could choose", () 
     describeUnavoidablePeak({ unavoidable_level: "HIGH", avoidable_level: "NO_DATA" }),
     /no crowd data for the rest/,
   );
+});
+
+/*
+ * A four-block walk due east, forty minutes end to end, so each block is ten
+ * minutes and a position on a block boundary lands on a round lead time. The
+ * third block is the one historical patterns call busy.
+ */
+const PREDICTED_ROUTE_LONGITUDES = [144.96, 144.961, 144.962, 144.963, 144.964];
+
+function predictedRoute(overrides = {}) {
+  const coordinates = PREDICTED_ROUTE_LONGITUDES.map((lon) => [lon, -37.81]);
+  const bands = overrides.bands || ["LOW", "LOW", "HIGH", "LOW"];
+  const confidences = overrides.confidences || ["HIGH", "HIGH", "HIGH", "HIGH"];
+
+  return {
+    id: "route-1",
+    route_source: overrides.route_source || "live",
+    duration_minutes: overrides.duration_minutes || 40,
+    geometry: { type: "LineString", coordinates },
+    segments: bands.map((band, index) => ({
+      id: `segment-${index + 1}`,
+      geometry: {
+        type: "LineString",
+        coordinates: coordinates.slice(index, index + 2),
+      },
+      historical_prediction_available: true,
+      predicted_band: band,
+      prediction_confidence: confidences[index],
+      predicted_for: overrides.predicted_for || null,
+    })),
+  };
+}
+
+test("stretches already walked past drop out of the ones still ahead", () => {
+  // Standing on the first boundary: a quarter of the walk is behind, and the
+  // busy third block is ten minutes off.
+  const ahead = segmentsAheadOfLocation(predictedRoute(), location(144.961, -37.81));
+
+  assert.deepEqual(
+    ahead.map((item) => item.index),
+    [1, 2, 3],
+  );
+  assert.equal(Math.round(ahead[1].etaMinutes), 10);
+});
+
+test("a predicted busy stretch is flagged before the walker reaches it", () => {
+  const alert = selectPredictiveAlert(
+    predictedRoute(),
+    location(144.961, -37.81),
+    "MEDIUM",
+  );
+
+  assert.equal(alert.predicted_condition, "HIGH");
+  assert.equal(alert.segment_index, 2);
+  assert.equal(alert.lead_minutes, 10);
+  assert.equal(alert.confidence, "HIGH");
+  assert.equal(alert.pattern_hour_drift, false);
+  assert.match(alert.message, /Likely high in about 10 minutes/);
+  // Internal band names must never reach the screen.
+  assert.doesNotMatch(alert.message, /HIGH|NO_DATA/);
+});
+
+test("the warning stops once the busy stretch is behind the walker", () => {
+  // Seven eighths of the way along: the third block has been walked.
+  const alert = selectPredictiveAlert(
+    predictedRoute(),
+    location(144.9635, -37.81),
+    "MEDIUM",
+  );
+
+  assert.equal(alert, null);
+});
+
+test("a stretch the walker is already inside is no longer a warning ahead", () => {
+  // Six tenths along: the busy third block has been entered but not finished.
+  const alert = selectPredictiveAlert(
+    predictedRoute(),
+    location(144.9624, -37.81),
+    "MEDIUM",
+  );
+
+  assert.equal(alert, null);
+});
+
+test("nothing new is raised inside the last few minutes, but a shown alert counts down", () => {
+  const nearly = location(144.9619, -37.81);
+
+  assert.equal(selectPredictiveAlert(predictedRoute(), nearly, "MEDIUM"), null);
+
+  const stillShowing = selectPredictiveAlert(predictedRoute(), nearly, "MEDIUM", {
+    raisedSignature: "2:HIGH",
+  });
+
+  assert.equal(stillShowing.lead_minutes, 1);
+  assert.match(stillShowing.message, /about a minute/);
+});
+
+test("a stretch further off than an hour is not called yet", () => {
+  const alert = selectPredictiveAlert(
+    predictedRoute({ duration_minutes: 400 }),
+    location(144.96, -37.81),
+    "MEDIUM",
+  );
+
+  assert.equal(alert, null);
+});
+
+test("no warning when the outlook sits inside the walker's own crowd limit", () => {
+  assert.equal(
+    selectPredictiveAlert(predictedRoute(), location(144.961, -37.81), "HIGH"),
+    null,
+  );
+});
+
+test("a thin historical pattern is not worth interrupting someone over", () => {
+  const route = predictedRoute({
+    confidences: ["HIGH", "HIGH", "LOW", "HIGH"],
+  });
+
+  assert.equal(
+    selectPredictiveAlert(route, location(144.961, -37.81), "MEDIUM"),
+    null,
+  );
+});
+
+test("an example route never produces a forecast", () => {
+  const route = predictedRoute({ route_source: "fallback" });
+
+  assert.equal(
+    selectPredictiveAlert(route, location(144.961, -37.81), "MEDIUM"),
+    null,
+  );
+});
+
+test("a trip running into a different hour says which pattern it is reading", () => {
+  const now = new Date(2026, 7, 4, 8, 30);
+  const route = predictedRoute({
+    predicted_for: new Date(2026, 7, 4, 9, 0).toISOString(),
+  });
+
+  const alert = selectPredictiveAlert(route, location(144.961, -37.81), "MEDIUM", {
+    now: now.getTime(),
+  });
+
+  assert.equal(alert.pattern_hour_drift, true);
+  assert.match(alert.message, /9am pattern/);
+  assert.match(alert.message, /around 8am/);
+  assert.match(alert.message, /check another route/);
+});
+
+test("dismissing a predicted-crowding warning keeps it dismissed", () => {
+  const alert = selectPredictiveAlert(
+    predictedRoute(),
+    location(144.961, -37.81),
+    "MEDIUM",
+  );
+  const signature = predictiveAlertSignature(alert);
+
+  assert.equal(signature, "2:HIGH");
+  assert.equal(shouldShowPredictiveAlert(alert, ""), true);
+  assert.equal(shouldShowPredictiveAlert(alert, signature), false);
+  assert.equal(shouldShowPredictiveAlert(null, ""), false);
 });
