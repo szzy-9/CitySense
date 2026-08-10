@@ -13,6 +13,7 @@ const INDICATOR_LABELS = {
 
 const DATA_STATUS_LABELS = {
   LIVE: "Live data",
+  HISTORICAL: "Historical data",
   FALLBACK: "Sample data",
   PROTOTYPE: "Example route",
   NO_DATA: "No data",
