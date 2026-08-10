@@ -236,9 +236,13 @@ def _external_table_has_rows(table_name):
 
 
 def _sensor_location_dict(row):
+    # In the DS schema sensor_name holds the machine code ("Bou292_T") and
+    # sensor_description holds the street a person would recognise. Both are
+    # carried so nothing has to guess which one is safe to show.
     return {
         "location_id": str(row["location_id"]),
         "sensor_name": str(row["sensor_name"]),
+        "sensor_description": str(row["sensor_description"] or row["sensor_name"]),
         "latitude": float(row["latitude"]),
         "longitude": float(row["longitude"]),
         "location_type": row["location_type"],

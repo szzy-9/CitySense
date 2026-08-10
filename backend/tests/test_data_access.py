@@ -47,6 +47,7 @@ def test_repository_reads_cbd_sensors_without_interpreting_status(app):
         {
             "location_id": "101",
             "sensor_name": "SYNTH-A",
+            "sensor_description": "Fictional sensor A",
             "latitude": -37.81,
             "longitude": 144.96,
             "location_type": "Outdoor",
@@ -57,6 +58,7 @@ def test_repository_reads_cbd_sensors_without_interpreting_status(app):
         {
             "location_id": "102",
             "sensor_name": "SYNTH-B",
+            "sensor_description": "Fictional sensor B",
             "latitude": -37.82,
             "longitude": 144.97,
             "location_type": "Indoor",
@@ -184,7 +186,8 @@ def test_current_departure_uses_latest_city_count(app):
 
     assert snapshot["source"] == "live"
     assert snapshot["sensor_location_source"] == "NEON"
-    assert snapshot["sensors"][0]["name"] == "SYNTH-A"
+    # The street a person would recognise, never the machine code beside it.
+    assert snapshot["sensors"][0]["name"] == "Fictional sensor A"
     assert snapshot["readings"] == [
         {
             "location_id": "101",
@@ -239,7 +242,7 @@ def test_non_live_departure_uses_matching_profile_day_and_hour(app):
     assert snapshot["sensors"] == [
         {
             "id": "101",
-            "name": "SYNTH-A",
+            "name": "Fictional sensor A",
             "lat": -37.81,
             "lon": 144.96,
             "count": 2.5,
