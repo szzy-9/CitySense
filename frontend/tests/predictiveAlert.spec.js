@@ -10,8 +10,8 @@
  * Flinders Street Station to Melbourne Museum: eight stretches, the first five
  * Moderate, 25.8 minutes end to end.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+import {flushPromises, mount} from "@vue/test-utils";
 
 import routePayload from "./fixtures/neon-route-payload.json";
 
@@ -22,7 +22,7 @@ vi.mock("../src/services/location.js", () => ({
   isLocationSupported: () => true,
   isDemoLocationActive: () => false,
   setDemoLocationEnabled: () => false,
-  demoLocationOrigin: () => ({ latitude: -37.8183, longitude: 144.9671 }),
+  demoLocationOrigin: () => ({latitude: -37.8183, longitude: 144.9671}),
   getCurrentPosition: async () => position(START[0], START[1]),
   watchPosition: async (_options, onPosition) => {
     pushPosition = onPosition;
@@ -35,11 +35,11 @@ const START = routePayload.routes[0].geometry.coordinates[0];
 const COORDINATES = routePayload.routes[0].geometry.coordinates;
 
 function position(lon, lat) {
-  return { coords: { latitude: lat, longitude: lon, accuracy: 8 } };
+  return {coords: {latitude: lat, longitude: lon, accuracy: 8}};
 }
 
 function locationAt([lon, lat], label) {
-  return { label, lat, lon, source: "autocomplete" };
+  return {label, lat, lon, source: "autocomplete"};
 }
 
 /* Move the walker to a share of the way along the route, as a fraction. */
@@ -68,14 +68,14 @@ function stubFetch() {
       return jsonResponse(routePayload);
     }
     if (path.includes("/api/refuges")) {
-      return jsonResponse({ refuges: [], nearest_refuge: null });
+      return jsonResponse({refuges: [], nearest_refuge: null});
     }
     return jsonResponse({});
   });
 }
 
 function jsonResponse(body) {
-  return { ok: true, json: async () => body };
+  return {ok: true, json: async () => body};
 }
 
 /*
@@ -83,15 +83,19 @@ function jsonResponse(body) {
  * with a position feed attached, exactly where a walker would be.
  */
 async function startNavigating(tolerance = "1") {
-  const { default: App } = await import("../src/App.vue");
-  const { default: LocationSearch } = await import(
+  const {default: App} = await import("../src/App.vue");
+  const {default: LocationSearch} = await import(
     "../src/components/LocationSearch.vue"
   );
 
   const wrapper = mount(App, {
-    global: { stubs: { MapView: true } },
+    global: {stubs: {MapView: true}},
     attachTo: document.body,
   });
+  await flushPromises();
+
+  // Every walker lands on the home screen first. Planning is behind it.
+  await wrapper.find('[data-testid="home-enter"]').trigger("click");
   await flushPromises();
 
   const searches = wrapper.findAllComponents(LocationSearch);
@@ -103,7 +107,7 @@ async function startNavigating(tolerance = "1") {
   await flushPromises();
 
   // A Moderate stretch only counts as above the limit for someone on Low. At
-  // the default of Medium this route is within tolerance and says nothing,
+  // the default of Moderate this route is within tolerance and says nothing,
   // which is the behaviour the last test in this file pins down.
   await wrapper.find('input[type="range"]').setValue(tolerance);
 
@@ -129,10 +133,13 @@ function alertText(wrapper) {
 describe("predicted crowding while walking a route (AC 2.2a, AC 2.2b)", () => {
   beforeEach(() => {
     pushPosition = null;
+    // The crowd tolerance now outlives a reload, so one test's choice would
+    // otherwise become the next test's starting point.
+    window.localStorage.clear();
     // Only the clock is faked, so flushPromises keeps working. Pinning it to
     // the hour the fixture was captured in keeps the lead times and the
     // hour-drift wording identical no matter when the suite runs.
-    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.useFakeTimers({toFake: ["Date"]});
     vi.setSystemTime(new Date(routePayload.request_settings.departure_time));
     vi.stubGlobal("fetch", stubFetch());
   });
@@ -189,12 +196,12 @@ describe("predicted crowding while walking a route (AC 2.2a, AC 2.2b)", () => {
       vi.fn(async (url, options) => {
         const path = String(url);
         if (path.includes("/api/routes/monitor")) {
-          return jsonResponse({ breached: false, upcoming_peak: "LOW", message: "" });
+          return jsonResponse({breached: false, upcoming_peak: "LOW", message: ""});
         }
         if (path.includes("/api/routes") && options?.method === "POST") {
           return jsonResponse(calm);
         }
-        return jsonResponse({ refuges: [], nearest_refuge: null });
+        return jsonResponse({refuges: [], nearest_refuge: null});
       }),
     );
 

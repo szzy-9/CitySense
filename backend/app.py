@@ -210,11 +210,11 @@ def create_app(test_config=None):
                         if refuge_source == "NEON" and refuge_list
                         else False
                     ),
-                    "message": (
-                        "Check the place when you arrive; conditions change."
-                        if refuge_source == "NEON"
-                        else "We picked these places ourselves. Check them when you arrive."
-                    ),
+                    # "message": (
+                    #     "Check the place when you arrive; conditions change."
+                    #     if refuge_source == "NEON"
+                    #     else "We picked these places ourselves. Check them when you arrive."
+                    # ),
                 },
             }
         )
@@ -230,7 +230,7 @@ def create_app(test_config=None):
             not isinstance(crowd_tolerance, str)
             or crowd_tolerance.upper() not in ALLOWED_CROWD_TOLERANCE
         ):
-            return _error("Crowd tolerance must be Low, Medium, or High.", 400)
+            return _error("Crowd tolerance must be Low, Moderate, or High.", 400)
 
         crowd_tolerance = crowd_tolerance.upper()
         try:
@@ -356,7 +356,7 @@ def create_app(test_config=None):
             not isinstance(crowd_tolerance, str)
             or crowd_tolerance.upper() not in ALLOWED_CROWD_TOLERANCE
         ):
-            return _error("Crowd tolerance must be Low, Medium, or High.", 400)
+            return _error("Crowd tolerance must be Low, Moderate, or High.", 400)
 
         try:
             coordinates = validate_route_coordinates(payload.get("coordinates"))
