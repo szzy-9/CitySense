@@ -46,7 +46,7 @@ describe("home screen", () => {
 
     expect(wrapper.get(".home-wordmark").text()).toBe("CitySense");
     expect(wrapper.get(".home-slogan").text()).toBe(
-      "Routes scored by their worst moment",
+      "CitySense travels through the city with you.",
     );
     expect(wrapper.text()).not.toContain("Where are you going?");
     wrapper.unmount();
@@ -56,7 +56,7 @@ describe("home screen", () => {
     const wrapper = await mountApp();
 
     expect(wrapper.get('input[type="range"]').element.value).toBe("2");
-    expect(wrapper.get(".tolerance-value").text()).toBe("Moderate");
+    expect(wrapper.get(".tolerance-value").text()).toBe("Moderate (15 to 40)");
     wrapper.unmount();
   });
 
@@ -69,7 +69,7 @@ describe("home screen", () => {
     // Past the home screen, and the planner's own slider agrees with it.
     expect(wrapper.text()).toContain("Where are you going?");
     expect(wrapper.get('input[type="range"]').element.value).toBe("1");
-    expect(wrapper.get(".tolerance-value").text()).toBe("Low");
+    expect(wrapper.get(".tolerance-value").text()).toBe("Low (Below 15)");
     wrapper.unmount();
   });
 
@@ -81,7 +81,7 @@ describe("home screen", () => {
     const second = await mountApp();
 
     expect(second.get('input[type="range"]').element.value).toBe("3");
-    expect(second.get(".tolerance-value").text()).toBe("High");
+    expect(second.get(".tolerance-value").text()).toBe("High (Over 40)");
     second.unmount();
   });
 

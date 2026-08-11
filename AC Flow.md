@@ -153,12 +153,12 @@ The criterion passes, but on the app's own shortlist rather than DS data, and th
 
 > QUIET PUBLIC SPACE
 > St Paul's Cathedral, side garden
-> 160 m straight-line distance
+> 160m
 > Sheltered garden on the Flinders Lane side, screened from the corner.
 > Open to all; services and events may affect access.
-> Chosen by us · Not officially verified
 
-Distance is stated as straight-line rather than dressed up as a walking time the app has not calculated, and the provenance line makes clear these are a hand-picked shortlist, not an official register.
+Distance is the straight-line metre count, not a walking time the app has not calculated.
+The availability line carries whatever caveat the entry itself needs, so a hand-picked shortlist is not read as a guarantee.
 
 ---
 

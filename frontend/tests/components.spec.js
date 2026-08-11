@@ -84,8 +84,10 @@ describe("RouteCard sensory indicator", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("we cannot promise it stays calm");
+    // The badge sentence was trimmed; the backend's reason now carries the
+    // whole explanation, so that is what the card has to keep showing.
     expect(wrapper.text()).toContain("All available walking routes");
+    expect(wrapper.text()).toContain("above your selected crowd limit");
   });
 
   it("does not print the headline confidence reason twice", () => {
@@ -140,7 +142,7 @@ describe("RouteCard sensory indicator", () => {
 });
 
 describe("RefugeFinder", () => {
-  it("opens without a planned route and shows type, straight-line distance, and disclaimer", async () => {
+  it("opens without a planned route and shows type, distance, and availability", async () => {
     setGeolocation((success) => {
       success({coords: {latitude: -37.81, longitude: 144.96}});
     });
@@ -169,8 +171,8 @@ describe("RefugeFinder", () => {
 
     const result = wrapper.get('[data-testid="refuge-result"]');
     expect(result.text()).toContain("Outdoor");
-    expect(result.text()).toContain("120 m straight-line distance");
-    expect(result.text()).toContain("Not officially verified");
+    expect(result.text()).toContain("120m");
+    expect(result.text()).toContain("Check local conditions.");
   });
 
   it("handles denied location permission and preserves an origin fallback", async () => {
@@ -235,28 +237,29 @@ function route(changes = {}) {
  * boundaries are pinned here rather than left to be rounded off later.
  */
 describe("crowd tolerance slider", () => {
-  it("states each band's per-minute count on the same side as the backend", () => {
-    const wrapper = mount(ToleranceSlider, {props: {modelValue: 2}});
+  it("names each band with the per-minute count the backend bands by", () => {
+    const labels = [1, 2, 3].map((value) => {
+      const wrapper = mount(ToleranceSlider, {props: {modelValue: value}});
+      const text = wrapper.get(".tolerance-value").text();
+      wrapper.unmount();
+      return text;
+    });
 
-    const ranges = wrapper.findAll(".slider-label-range").map((tag) => tag.text());
-    expect(ranges).toEqual(["Under 15", "15-40", "Over 40"]);
+    expect(labels).toEqual([
+      "Low (Below 15)",
+      "Moderate (15 to 40)",
+      "High (Over 40)",
+    ]);
     // 15 and 40 belong to Moderate, so neither may be claimed by a neighbour.
-    expect(ranges[0]).not.toContain("15-");
-    expect(ranges[2]).not.toContain("40-");
-  });
-
-  it("names the bands alongside their counts", () => {
-    const wrapper = mount(ToleranceSlider, {props: {modelValue: 2}});
-
-    const names = wrapper.findAll(".slider-label-name").map((tag) => tag.text());
-    expect(names).toEqual(["Low", "Moderate", "High"]);
+    expect(labels[0]).not.toContain("15-");
+    expect(labels[2]).not.toContain("40-");
   });
 
   it("speaks the count with the band, so it is not sighted-only", () => {
     const wrapper = mount(ToleranceSlider, {props: {modelValue: 1}});
 
     expect(wrapper.get('input[type="range"]').attributes("aria-valuetext")).toBe(
-      "Low, under 15 people a minute",
+      "Low (Below 15), under 15 people a minute",
     );
   });
 
