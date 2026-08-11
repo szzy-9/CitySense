@@ -39,6 +39,18 @@ def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
                 _live_cache["snapshot"] = snapshot
                 _live_cache["stored_at"] = time.monotonic()
             return snapshot
+        except httpx.ConnectError as error:
+            request = getattr(error, "request", None)
+            request_url = getattr(request, "url", None)
+            cause = getattr(error, "__cause__", None)
+            logger.warning(
+                "City pedestrian API connection failed: "
+                "url=%s error=%s error_repr=%s cause=%s",
+                request_url if request_url is not None else "unavailable",
+                str(error),
+                repr(error),
+                repr(cause) if cause is not None else "unavailable",
+            )
         except httpx.HTTPStatusError as error:
             logger.warning(
                 "City pedestrian API HTTP error: status=%s url=%s response=%s",
