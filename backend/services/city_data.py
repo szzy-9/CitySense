@@ -29,6 +29,12 @@ _live_cache = {"snapshot": None, "stored_at": 0.0}
 CITY_API_SSL_CONTEXT = ssl.create_default_context()
 CITY_API_SSL_CONTEXT.minimum_version = ssl.TLSVersion.TLSv1_2
 CITY_API_SSL_CONTEXT.maximum_version = ssl.TLSVersion.TLSv1_2
+logger.info(
+    "City API TLS runtime: openssl=%s tls1_2_supported=%s tls1_3_supported=%s",
+    ssl.OPENSSL_VERSION,
+    ssl.HAS_TLSv1_2,
+    ssl.HAS_TLSv1_3,
+)
 
 
 def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
