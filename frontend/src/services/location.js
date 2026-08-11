@@ -3,12 +3,12 @@ import { Geolocation } from "@capacitor/geolocation";
 
 
 /*
- * Demo Mode: a fixed stand-in position, for showing the app away from the CBD.
+ * Demo Mode: a stand-in position, for showing the app away from the CBD.
  *
  * CitySense holds data only for the Hoddle Grid and the API rejects any
  * coordinate outside it, so a device at a campus or a conference hall gets an
  * error rather than a wrong answer. With Demo Mode on, every position lookup
- * returns one CBD point instead of reading the device.
+ * returns a CBD point instead of reading the device.
  *
  * This ships switched off, and while it is on the interface says so on every
  * screen. Somewhere between the two lies the thing this must never become: an
@@ -16,13 +16,38 @@ import { Geolocation } from "@capacitor/geolocation";
  */
 const DEMO_STORAGE_KEY = "citysense.demoLocation";
 const DEMO_WATCH_ID = "demo-origin-watch";
-// Flinders Street Station, the corner most people picture when they picture
-// the CBD. Override with VITE_DEMO_ORIGIN to pin Demo Mode somewhere else.
-const FALLBACK_DEMO_ORIGIN = { latitude: -37.8183, longitude: 144.9671 };
-const DEMO_ORIGIN =
-  readDemoOrigin(import.meta.env.VITE_DEMO_ORIGIN) || FALLBACK_DEMO_ORIGIN;
+/*
+ * The Hoddle Grid, corner to corner: Flinders Street up to La Trobe Street,
+ * Spencer Street across to Spring Street. 66 of the 100 pedestrian sensors sit
+ * inside this rectangle, and a point drawn anywhere in it is a median 120 m
+ * from the nearest one, so a demo trip is scored on real counts rather than on
+ * whatever the fallback can guess. Standing on one fixed corner every time
+ * hides the thing a demo is meant to show: the same trip reads differently
+ * depending on where in the grid it starts.
+ */
+const CBD_BOUNDS = {
+  minLatitude: -37.821,
+  maxLatitude: -37.8075,
+  minLongitude: 144.95,
+  maxLongitude: 144.974,
+};
+// Pin Demo Mode to one point with VITE_DEMO_ORIGIN when a run has to be
+// repeatable; without it each switch-on draws a fresh corner of the grid.
+const PINNED_DEMO_ORIGIN = readDemoOrigin(import.meta.env.VITE_DEMO_ORIGIN);
 
 let demoEnabled = readStoredDemoState();
+let demoOrigin = PINNED_DEMO_ORIGIN || randomCbdOrigin();
+
+function randomCbdOrigin() {
+  const { minLatitude, maxLatitude, minLongitude, maxLongitude } = CBD_BOUNDS;
+  const between = (low, high) => low + Math.random() * (high - low);
+  return {
+    // Six decimals is about a tenth of a metre; more would be a false claim
+    // about how precisely anybody is standing anywhere.
+    latitude: Number(between(minLatitude, maxLatitude).toFixed(6)),
+    longitude: Number(between(minLongitude, maxLongitude).toFixed(6)),
+  };
+}
 
 function readDemoOrigin(value) {
   if (!value) {
@@ -55,11 +80,20 @@ export function isDemoLocationActive() {
 }
 
 export function demoLocationOrigin() {
-  return { ...DEMO_ORIGIN };
+  return { ...demoOrigin };
 }
 
 export function setDemoLocationEnabled(enabled) {
+  const wasEnabled = demoEnabled;
   demoEnabled = Boolean(enabled);
+  /*
+   * A new corner of the grid per switch-on, not per lookup. The position a
+   * walker is standing in has to hold still while they read a route off it;
+   * redrawing it mid-trip would show them teleporting.
+   */
+  if (demoEnabled && !wasEnabled && !PINNED_DEMO_ORIGIN) {
+    demoOrigin = randomCbdOrigin();
+  }
   try {
     globalThis.localStorage?.setItem(DEMO_STORAGE_KEY, demoEnabled ? "on" : "off");
   } catch {
@@ -71,8 +105,8 @@ export function setDemoLocationEnabled(enabled) {
 function demoPosition() {
   return {
     coords: {
-      latitude: DEMO_ORIGIN.latitude,
-      longitude: DEMO_ORIGIN.longitude,
+      latitude: demoOrigin.latitude,
+      longitude: demoOrigin.longitude,
       accuracy: 10,
     },
     timestamp: Date.now(),

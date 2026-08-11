@@ -83,6 +83,7 @@ const raisedPredictiveSignature = ref("");
 const navigationClock = ref(Date.now());
 const pendingAlternative = ref(null);
 const alternativeLoading = ref(false);
+const routesSection = ref(null);
 const showLocationSimulator = import.meta.env.DEV;
 const arrivalDistanceMetres = Number(
   import.meta.env.VITE_ARRIVAL_DISTANCE_METERS || 35,
@@ -227,7 +228,7 @@ const demoLocationNotice = computed(() => {
   }
   const point = demoLocationOrigin();
   return (
-    "Demo Mode is on. CitySense is reporting a fixed position at " +
+    "Demo Mode is on. CitySense is reporting a random CBD position: at " +
     `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}`
   );
 });
@@ -243,7 +244,7 @@ async function toggleDemoLocation() {
   currentLocation.value = null;
   currentAccuracy.value = null;
   positionMessage.value = demoLocation.value
-    ? "Demo Mode is on. Positions come from a fixed CBD point."
+    ? "Demo Mode is on. Positions come from a random CBD point."
     : "Demo Mode is off. Positions come from this device again.";
 
   await stopLocationTracking();
@@ -380,7 +381,33 @@ async function useCurrentLocation() {
 }
 
 async function findRoutes() {
-  await requestRoutes();
+  const body = await requestRoutes();
+  if (body) {
+    await revealRoutes();
+  }
+}
+
+/*
+ * The routes render below the fold on a phone, so a walker who has just
+ * pressed the button is left looking at the form that produced them and no
+ * sign anything happened. Bring the comparison up to the top of the screen
+ * instead, and let a walker who has asked for less motion have it without the
+ * animation.
+ */
+async function revealRoutes() {
+  await nextTick();
+  const section = routesSection.value;
+  if (typeof section?.scrollIntoView !== "function") {
+    return;
+  }
+
+  const stillMotion = globalThis.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  )?.matches;
+  section.scrollIntoView({
+    behavior: stillMotion ? "auto" : "smooth",
+    block: "start",
+  });
 }
 
 async function requestRoutes(options = {}) {
@@ -939,7 +966,7 @@ function readPositionAccuracy(position) {
           :class="{ 'is-on': demoLocation }"
           type="button"
           :aria-pressed="demoLocation"
-          aria-label="Demo Mode: report a fixed CBD position instead of reading this device"
+          aria-label="Demo Mode: report a random CBD position instead of reading this device"
           data-testid="demo-toggle"
           @click="toggleDemoLocation"
         >
@@ -1000,7 +1027,13 @@ function readPositionAccuracy(position) {
 
         <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
 
-        <section aria-live="polite" aria-labelledby="routes-title">
+        <section
+          ref="routesSection"
+          class="routes-section"
+          aria-live="polite"
+          aria-labelledby="routes-title"
+          data-testid="routes-section"
+        >
           <p class="screen-label">Route comparison</p>
           <h2 id="routes-title" class="section-title">Fastest and calmest</h2>
           <p v-if="result" class="field-hint">

@@ -585,6 +585,12 @@ input[type="datetime-local"] {
 
 /* ------------------------------------------------------------- route cards */
 
+/* Found routes are scrolled up to, so the label needs air above it rather than
+   sitting flush against the top edge of the screen. */
+.routes-section {
+  scroll-margin-top: var(--space-5);
+}
+
 .results {
   display: flex;
   margin-top: var(--space-6);
