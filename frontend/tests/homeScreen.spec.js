@@ -46,7 +46,7 @@ describe("home screen", () => {
 
     expect(wrapper.get(".home-wordmark").text()).toBe("CitySense");
     expect(wrapper.get(".home-slogan").text()).toBe(
-      "CitySense travels through the city with you.",
+      "CitySense creating a calmer path with you.",
     );
     expect(wrapper.text()).not.toContain("Where are you going?");
     wrapper.unmount();
