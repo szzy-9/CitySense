@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 870" width="1440" height="870" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0 H0 V40" fill="none" stroke="#EDF1EF" stroke-width="1"/>
+    </pattern>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5B6E73"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B4402C"/>
+    </marker>
+  </defs>
+
+  <rect width="1440" height="870" fill="#FFFFFF"/>
+  <rect x="24" y="112" width="1381" height="660" fill="url(#grid)"/>
+
+  <!-- masthead -->
+  <text x="24" y="34" font-size="12" font-weight="700" letter-spacing="3" fill="#6B7B80">CITYSENSE &#183; SYSTEM ARCHITECTURE</text>
+  <text x="24" y="70" font-size="25" font-weight="700" fill="#17242A">Vue 3 &#183; Flask on Render &#183; Neon PostgreSQL &#183; external routing and pedestrian data</text>
+  <text x="24" y="93" font-size="13" fill="#6B7B80">As built, checked against the repository at commit c9de560. Red marks what the first version of this diagram got wrong.</text>
+
+  <!-- ============ CI / CD ============ -->
+  <rect x="940" y="112" width="465" height="176" rx="6" fill="none" stroke="#7C5FA8" stroke-width="1.2" stroke-dasharray="6 5"/>
+  <text x="956" y="134" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#7C5FA8">CI / CD &#183; TESTS ON EVERY PUSH</text>
+
+  <rect x="970" y="150" width="72" height="72" rx="10" fill="#6B4F97"/>
+  <text x="1006" y="194" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">Git</text>
+  <text x="1006" y="242" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">GitHub</text>
+  <text x="1006" y="257" font-size="10.5" fill="#6B7B80" text-anchor="middle">push or PR</text>
+
+  <rect x="1100" y="150" width="72" height="72" rx="10" fill="#7C5FA8"/>
+  <text x="1136" y="194" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">CI</text>
+  <text x="1136" y="242" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Actions</text>
+  <text x="1136" y="257" font-size="10.5" fill="#6B7B80" text-anchor="middle">pytest &#183; pnpm test &#183; build</text>
+
+  <rect x="1230" y="150" width="72" height="72" rx="10" fill="#7C5FA8"/>
+  <text x="1266" y="194" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">APK</text>
+  <text x="1266" y="242" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Android build</text>
+  <text x="1266" y="257" font-size="10.5" fill="#6B7B80" text-anchor="middle">Capacitor debug APK</text>
+
+  <line x1="1042" y1="186" x2="1094" y2="186" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <line x1="1172" y1="186" x2="1224" y2="186" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <line x1="1136" y1="288" x2="1136" y2="312" stroke="#B4402C" stroke-width="1.6" marker-end="url(#arwR)"/>
+  <text x="1148" y="306" font-size="10.5" font-weight="700" fill="#B4402C">deploy is manual (autoDeploy: false)</text>
+
+  <!-- ============ CLIENT ============ -->
+  <rect x="24" y="318" width="276" height="442" rx="6" fill="none" stroke="#5B6E73" stroke-width="1.2" stroke-dasharray="6 5"/>
+  <text x="40" y="340" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#5B6E73">CLIENT</text>
+
+  <rect x="124" y="352" width="76" height="76" rx="10" fill="#6E7B84"/>
+  <text x="162" y="398" font-size="19" font-weight="700" fill="#FFFFFF" text-anchor="middle">User</text>
+  <text x="162" y="448" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Client</text>
+  <text x="162" y="463" font-size="10.5" fill="#6B7B80" text-anchor="middle">browser or Android APK</text>
+
+  <line x1="162" y1="472" x2="162" y2="490" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+
+  <rect x="124" y="494" width="76" height="76" rx="10" fill="#57A08D"/>
+  <text x="162" y="540" font-size="19" font-weight="700" fill="#FFFFFF" text-anchor="middle">Vue</text>
+  <text x="162" y="590" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Vue 3 SPA</text>
+  <text x="162" y="605" font-size="10.5" font-weight="700" fill="#B4402C" text-anchor="middle">served by Flask, same origin</text>
+
+  <line x1="162" y1="614" x2="162" y2="632" stroke="#B4402C" stroke-width="1.6" marker-end="url(#arwR)"/>
+
+  <rect x="124" y="636" width="76" height="76" rx="10" fill="#E3A44A"/>
+  <text x="162" y="682" font-size="19" font-weight="700" fill="#FFFFFF" text-anchor="middle">MAP</text>
+  <text x="162" y="732" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">OSM / CARTO tiles</text>
+  <text x="162" y="747" font-size="10.5" font-weight="700" fill="#B4402C" text-anchor="middle">fetched by the browser</text>
+
+  <!-- Vue to API -->
+  <path d="M200,532 H262 V406 H354" fill="none" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <text x="308" y="398" font-size="10.5" fill="#6B7B80">REST /api</text>
+
+  <!-- ============ RENDER SERVICE ============ -->
+  <rect x="330" y="318" width="1075" height="190" rx="6" fill="none" stroke="#4E9C86" stroke-width="1.2" stroke-dasharray="6 5"/>
+  <text x="348" y="340" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#4E9C86">RENDER &#183; ONE DOCKER WEB SERVICE &#183; gunicorn, 2 workers x 2 threads &#183; serves the built Vue app AND /api</text>
+
+  <rect x="360" y="360" width="92" height="92" rx="10" fill="#47738D"/>
+  <text x="406" y="414" font-size="21" font-weight="700" fill="#FFFFFF" text-anchor="middle">API</text>
+  <text x="406" y="470" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Flask app.py</text>
+  <text x="406" y="485" font-size="10.5" fill="#6B7B80" text-anchor="middle">routes + static SPA</text>
+
+  <line x1="452" y1="406" x2="474" y2="406" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+
+  <g fill="#79BFA3">
+    <rect x="480" y="364" width="84" height="84" rx="10"/>
+    <rect x="612" y="364" width="84" height="84" rx="10"/>
+    <rect x="744" y="364" width="84" height="84" rx="10"/>
+    <rect x="876" y="364" width="84" height="84" rx="10"/>
+    <rect x="1008" y="364" width="84" height="84" rx="10"/>
+    <rect x="1140" y="364" width="84" height="84" rx="10"/>
+    <rect x="1272" y="364" width="84" height="84" rx="10"/>
+  </g>
+  <g font-size="21" font-weight="700" fill="#FFFFFF" text-anchor="middle">
+    <text x="522" y="414">RT</text>
+    <text x="654" y="414">SC</text>
+    <text x="786" y="414">MO</text>
+    <text x="918" y="414">PR</text>
+    <text x="1050" y="414">ST</text>
+    <text x="1182" y="414">RF</text>
+    <text x="1314" y="414">CA</text>
+  </g>
+  <g font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">
+    <text x="522" y="470">Routing</text>
+    <text x="654" y="470">Scoring</text>
+    <text x="786" y="470">Monitor</text>
+    <text x="918" y="470">Prediction</text>
+    <text x="1050" y="470">Streets</text>
+    <text x="1182" y="470">Refuges</text>
+    <text x="1314" y="470">Cache</text>
+  </g>
+  <g font-size="10.5" fill="#6B7B80" text-anchor="middle">
+    <text x="522" y="485">ORS call + fallback</text>
+    <text x="654" y="485">peak, not mean</text>
+    <text x="786" y="485">60 s live re-check</text>
+    <text x="918" y="485">day + hour profile</text>
+    <text x="1050" y="485">reverse geocode</text>
+    <text x="1182" y="485">quiet places</text>
+  </g>
+  <text x="1314" y="485" font-size="10.5" font-weight="700" fill="#B4402C" text-anchor="middle">60 s, not warmed</text>
+
+  <!-- API to database -->
+  <path d="M406,452 V560 H858 V596" fill="none" stroke="#B4402C" stroke-width="1.6" marker-end="url(#arwR)"/>
+  <text x="416" y="552" font-size="10.5" font-weight="700" fill="#B4402C">read only &#183; the app never writes to Neon</text>
+
+  <!-- services to external -->
+  <line x1="1132" y1="508" x2="1132" y2="562" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <text x="1142" y="540" font-size="10.5" fill="#6B7B80">HTTPS &#183; 6-8 s timeout</text>
+
+  <!-- ============ DATA HANDOFF ============ -->
+  <rect x="344" y="568" width="428" height="172" rx="6" fill="none" stroke="#C6635F" stroke-width="1.2" stroke-dasharray="6 5"/>
+  <text x="360" y="590" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#C6635F">DATA HANDOFF &#183; THIS REPO VALIDATES, DS LOADS NEON</text>
+
+  <rect x="372" y="606" width="84" height="84" rx="10" fill="#C6635F"/>
+  <text x="414" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">ETL</text>
+  <text x="414" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Python ETL</text>
+  <text x="414" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">clean + aggregate</text>
+
+  <rect x="508" y="606" width="84" height="84" rx="10" fill="#C6635F"/>
+  <text x="550" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">CSV</text>
+  <text x="550" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Validated CSV</text>
+  <text x="550" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">3 handoff files</text>
+
+  <rect x="644" y="606" width="84" height="84" rx="10" fill="#E3A44A"/>
+  <text x="686" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">DS</text>
+  <text x="686" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">DS team</text>
+  <text x="686" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">owns the citysense schema</text>
+
+  <line x1="456" y1="648" x2="502" y2="648" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <line x1="592" y1="648" x2="638" y2="648" stroke="#B4402C" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arwR)"/>
+
+  <rect x="812" y="602" width="92" height="92" rx="10" fill="#1E3742"/>
+  <text x="858" y="656" font-size="21" font-weight="700" fill="#FFFFFF" text-anchor="middle">PG</text>
+  <text x="858" y="712" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">Neon PostgreSQL</text>
+  <text x="858" y="727" font-size="10.5" fill="#6B7B80" text-anchor="middle">DS-managed schema</text>
+
+  <line x1="728" y1="648" x2="806" y2="648" stroke="#5B6E73" stroke-width="1.6" marker-end="url(#arw)"/>
+  <text x="767" y="638" font-size="10.5" fill="#6B7B80" text-anchor="middle">loads</text>
+
+  <!-- ============ EXTERNAL ============ -->
+  <rect x="930" y="568" width="475" height="172" rx="6" fill="none" stroke="#E3A44A" stroke-width="1.2" stroke-dasharray="6 5"/>
+  <text x="946" y="590" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#C08A32">EXTERNAL SERVICES &#183; CALLED BY FLASK</text>
+
+  <rect x="962" y="606" width="84" height="84" rx="10" fill="#E3A44A"/>
+  <text x="1004" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">GEO</text>
+  <text x="1004" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">HeiGIT Pelias</text>
+  <text x="1004" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">address search + reverse</text>
+
+  <rect x="1104" y="606" width="84" height="84" rx="10" fill="#E3A44A"/>
+  <text x="1146" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">ORS</text>
+  <text x="1146" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">OpenRouteService</text>
+  <text x="1146" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">walking routes</text>
+
+  <rect x="1246" y="606" width="84" height="84" rx="10" fill="#E3A44A"/>
+  <text x="1288" y="656" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="middle">CoM</text>
+  <text x="1288" y="710" font-size="12.5" font-weight="700" fill="#17242A" text-anchor="middle">City of Melbourne</text>
+  <text x="1288" y="725" font-size="10.5" fill="#6B7B80" text-anchor="middle">pedestrian counts</text>
+
+  <!-- ============ FOOTER ============ -->
+  <rect x="24" y="790" width="1381" height="56" rx="4" fill="#E8EFEA"/>
+  <text x="44" y="814" font-size="12" fill="#17242A">Route geometry and user location never persisted &#183; live counts cached 60 s &#183; fallbacks in use: cached pedestrian JSON, example routes on an ORS timeout, curated refuge list while the refuge table is empty</text>
+  <text x="44" y="834" font-size="12" font-weight="700" fill="#B4402C">Corrected from v1: one service, no separate static site &#183; database is read only &#183; deploy is manual &#183; tiles come from the browser &#183; cache is not warmed &#183; Streets, Refuges and Monitor added</text>
+</svg>

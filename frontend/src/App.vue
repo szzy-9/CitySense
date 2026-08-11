@@ -3,11 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 
 import BandIcon from "./components/BandIcon.vue";
 import DataStatus from "./components/DataStatus.vue";
+import HomeScreen from "./components/HomeScreen.vue";
 import LocationSearch from "./components/LocationSearch.vue";
 import MapView from "./components/MapView.vue";
 import OverwhelmMode from "./components/OverwhelmMode.vue";
 import RefugeFinder from "./components/RefugeFinder.vue";
 import RouteCard from "./components/RouteCard.vue";
+import ToleranceSlider from "./components/ToleranceSlider.vue";
 import { apiUrl } from "./services/api.js";
 import {
   clearWatch,
@@ -42,8 +44,14 @@ import {
 import { UserFacingError, messageForError } from "./userMessages.js";
 
 const THEME_KEY = "citysense.theme";
+const TOLERANCE_KEY = "citysense.crowdTolerance";
 const LOAD_LEVELS = ["LOW", "MODERATE", "HIGH", "NO_DATA"];
 
+// The home screen is where a tolerance is set before any planning happens. It
+// is shown on every load: the choice persists, the decision to walk past it
+// does not, because how much crowding someone can take today is not a settled
+// fact about them.
+const hasEntered = ref(false);
 const theme = ref("dark");
 const demoLocation = ref(isDemoLocationActive());
 const startLocation = ref(null);
@@ -52,7 +60,7 @@ const currentLocation = ref(null);
 const currentAccuracy = ref(null);
 const departureTime = ref("");
 const routeDepartureIso = ref("");
-const crowdToleranceValue = ref(2);
+const crowdToleranceValue = ref(readStoredTolerance());
 const result = ref(null);
 const selectedRouteId = ref("");
 const refuges = ref([]);
@@ -117,10 +125,6 @@ const selectedRoute = computed(() => {
 
 const crowdTolerance = computed(() => {
   return ["LOW", "MEDIUM", "HIGH"][crowdToleranceValue.value - 1];
-});
-
-const crowdToleranceLabel = computed(() => {
-  return crowdTolerance.value[0] + crowdTolerance.value.slice(1).toLowerCase();
 });
 
 // Shortest first, then the longer and calmer ones. Every route the backend
@@ -224,7 +228,7 @@ const demoLocationNotice = computed(() => {
   const point = demoLocationOrigin();
   return (
     "Demo Mode is on. CitySense is reporting a fixed position at " +
-    `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}, not reading this device.`
+    `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}`
   );
 });
 
@@ -286,6 +290,36 @@ function applyTheme(nextTheme) {
 
 function toggleTheme() {
   applyTheme(theme.value === "dark" ? "light" : "dark");
+}
+
+/*
+ * A tolerance out of range would index past the LOW/MEDIUM/HIGH scale and send
+ * an undefined tolerance to the backend, so anything unreadable falls back to
+ * the middle of the scale rather than being trusted.
+ */
+function readStoredTolerance() {
+  try {
+    const stored = Number(window.localStorage.getItem(TOLERANCE_KEY));
+    return stored === 1 || stored === 2 || stored === 3 ? stored : 2;
+  } catch {
+    // Private browsing can refuse storage. Moderate is the default either way.
+    return 2;
+  }
+}
+
+watch(crowdToleranceValue, (value) => {
+  try {
+    window.localStorage.setItem(TOLERANCE_KEY, String(value));
+  } catch {
+    // The choice simply does not survive a reload. Routing still honours it.
+  }
+});
+
+function enterApp() {
+  hasEntered.value = true;
+  nextTick(() => {
+    document.querySelector("[data-screen-heading]")?.focus();
+  });
 }
 
 onBeforeUnmount(() => {
@@ -865,8 +899,14 @@ function readPositionAccuracy(position) {
 </script>
 
 <template>
+  <HomeScreen
+    v-if="!hasEntered"
+    v-model="crowdToleranceValue"
+    @enter="enterApp"
+  />
+
   <OverwhelmMode
-    v-if="currentScreen === 'overwhelm'"
+    v-else-if="currentScreen === 'overwhelm'"
     :refuge="refugeResponse?.nearest_refuge"
     :calculation-basis="refugeResponse?.calculation_basis || ''"
     :status-message="refugeResponse?.data_status?.message"
@@ -884,7 +924,7 @@ function readPositionAccuracy(position) {
       >
         CitySense
       </button>
-      <span class="tagline">Routes scored by their worst moment</span>
+    
       <div class="masthead-controls">
         <button
           class="pill-toggle"
@@ -920,7 +960,7 @@ function readPositionAccuracy(position) {
           <LocationSearch
             field-id="start"
             label="From"
-            placeholder="Search a Melbourne address"
+            placeholder="Search a Melbourne CBD address"
             :model-value="startLocation"
             :allow-current-location="true"
             :locating="locating"
@@ -949,11 +989,8 @@ function readPositionAccuracy(position) {
           />
 
           <div class="field field-group">
-            <label for="departure-time">Leaving</label>
+            <label for="departure-time">Leaving (Optional, default to now)</label>
             <input id="departure-time" v-model="departureTime" type="datetime-local" />
-            <p class="field-hint">
-              Optional. Tell us when you are leaving and we will show how busy it is likely to be.
-            </p>
           </div>
 
           <button class="primary-button" type="submit" :disabled="!canFindRoutes">
@@ -981,11 +1018,6 @@ function readPositionAccuracy(position) {
               @select="navigateWithRoute"
             />
           </div>
-
-          <p v-else class="notice">
-            Type an address, then pick it from the list. We use the place you pick, not the words
-            you type.
-          </p>
         </section>
 
         <section
@@ -1010,30 +1042,7 @@ function readPositionAccuracy(position) {
           </div>
         </section>
 
-        <section class="tolerance" aria-labelledby="tolerance-title">
-          <p class="tolerance-heading">
-            <span id="tolerance-title">Crowd tolerance</span>
-            <span class="tolerance-value">{{ crowdToleranceLabel }}</span>
-          </p>
-          <p class="tolerance-hint">
-            How busy a street can get before we route you around it.
-          </p>
-          <div class="slider-wrap">
-            <input
-              id="crowd-tolerance"
-              v-model.number="crowdToleranceValue"
-              type="range"
-              min="1"
-              max="3"
-              step="1"
-              :aria-valuetext="crowdToleranceLabel"
-              aria-labelledby="tolerance-title"
-            />
-            <div class="slider-labels" aria-hidden="true">
-              <span>Low</span><span>Medium</span><span>High</span>
-            </div>
-          </div>
-        </section>
+        <ToleranceSlider v-model="crowdToleranceValue" />
 
         <RefugeFinder :confirmed-origin="startLocation" />
       </div>

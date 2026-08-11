@@ -137,14 +137,6 @@ function levelClass(level) {
       </span>
     </div>
 
-    <p v-if="route.recommended" class="recommended-badge" data-testid="recommended-route">
-      {{
-        route.congestion_avoidable
-          ? "Our pick for your crowd limit"
-          : "Our pick, though we cannot promise it stays calm"
-      }}
-    </p>
-
     <div class="route-detail">
       <p v-if="streetPath" class="street-path" data-testid="street-path">
         {{ streetPath }}

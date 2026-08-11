@@ -31,7 +31,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: "Search a Melbourne address",
+    default: "Search a Melbourne CBD address",
   },
 });
 
