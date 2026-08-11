@@ -79,7 +79,7 @@ async function loadRefuges(origin) {
     refuges.value = body.refuges || [];
     message.value =
       body.data_status?.message ||
-      "We picked these places ourselves. Check them when you arrive.";
+      "";
   } catch (error) {
     message.value = messageForError(
       error,
@@ -101,8 +101,8 @@ function formatDistance(metres) {
     return "Distance unavailable";
   }
   return metres < 1000
-    ? `${Math.round(metres)} m straight-line distance`
-    : `${(metres / 1000).toFixed(1)} km straight-line distance`;
+    ? `${Math.round(metres)}m`
+    : `${(metres / 1000).toFixed(1)}km`;
 }
 </script>
 
@@ -110,8 +110,7 @@ function formatDistance(metres) {
   <section class="refuge-finder" aria-labelledby="refuge-finder-title">
     <div v-if="!open" class="refuge-finder-entry">
       <p class="screen-label">Quiet places</p>
-      <h2 id="refuge-finder-title" class="section-title">Need a nearby place to pause?</h2>
-      <p>See quiet spots close by, without planning a whole route.</p>
+      <h3 id="refuge-finder-title" class="section-title">Need a nearby place to pause?</h3>
       <button
         type="button"
         class="secondary-button"
@@ -126,7 +125,7 @@ function formatDistance(metres) {
       <div class="refuge-finder-heading">
         <div>
           <p class="screen-label">Quiet places</p>
-          <h2 id="refuge-finder-title" class="section-title">Quiet places nearby</h2>
+          <h2 id="refuge-finder-title" class="section-title">Quiet places nearby chosen by us</h2>
         </div>
         <button type="button" class="text-button" @click="closeFinder">Close</button>
       </div>
@@ -151,7 +150,6 @@ function formatDistance(metres) {
           <p class="refuge-distance-small">{{ formatDistance(refuge.distance_meters) }}</p>
           <p>{{ refuge.short_description }}</p>
           <p class="refuge-availability">{{ refuge.availability }}</p>
-          <p class="verification-note">Chosen by us · Not officially verified</p>
         </li>
       </ul>
     </div>

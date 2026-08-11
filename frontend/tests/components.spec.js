@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import {afterEach, describe, expect, it, vi} from "vitest";
+import {flushPromises, mount} from "@vue/test-utils";
 
 import RefugeFinder from "../src/components/RefugeFinder.vue";
 import RouteCard from "../src/components/RouteCard.vue";
+import ToleranceSlider from "../src/components/ToleranceSlider.vue";
 
 
 afterEach(() => {
@@ -13,7 +14,7 @@ describe("RouteCard sensory indicator", () => {
   it("shows text and an icon immediately without a click", () => {
     const wrapper = mount(RouteCard, {
       props: {
-        route: route({ sensory_indicator: "LOW" }),
+        route: route({sensory_indicator: "LOW"}),
         role: "Calmest",
       },
     });
@@ -46,7 +47,7 @@ describe("RouteCard sensory indicator", () => {
   it("shows an above-threshold HIGH indicator without expansion", () => {
     const wrapper = mount(RouteCard, {
       props: {
-        route: route({ sensory_indicator: "HIGH", sensory_level: "HIGH" }),
+        route: route({sensory_indicator: "HIGH", sensory_level: "HIGH"}),
         role: "Fastest",
       },
     });
@@ -128,7 +129,7 @@ describe("RouteCard sensory indicator", () => {
 
   it("shows historical prediction unavailable without a zero value", () => {
     const wrapper = mount(RouteCard, {
-      props: { route: route(), role: "Fastest" },
+      props: {route: route(), role: "Fastest"},
     });
 
     const outlook = wrapper.get('[data-testid="historical-prediction"]');
@@ -141,7 +142,7 @@ describe("RouteCard sensory indicator", () => {
 describe("RefugeFinder", () => {
   it("opens without a planned route and shows type, straight-line distance, and disclaimer", async () => {
     setGeolocation((success) => {
-      success({ coords: { latitude: -37.81, longitude: 144.96 } });
+      success({coords: {latitude: -37.81, longitude: 144.96}});
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,
@@ -181,7 +182,7 @@ describe("RefugeFinder", () => {
       source: "autocomplete",
     };
     const wrapper = mount(RefugeFinder, {
-      props: { confirmedOrigin },
+      props: {confirmedOrigin},
     });
 
     await wrapper.get('[data-testid="open-refuge-finder"]').trigger("click");
@@ -220,8 +221,50 @@ function route(changes = {}) {
     recommended: true,
     congestion_avoidable: true,
     segments: [
-      { id: "segment-1", sensory_level: "LOW" },
+      {id: "segment-1", sensory_level: "LOW"},
     ],
     ...changes,
   };
 }
+
+/*
+ * The counts on this slider are the boundaries the backend routes by, in
+ * services/scoring.py load_level_for_count: under 15 a minute is Low, 15 to 40
+ * inclusive is Moderate, above 40 is High. A walker reading "16-40" would be
+ * told the wrong thing about a street counting exactly 15, so the two shared
+ * boundaries are pinned here rather than left to be rounded off later.
+ */
+describe("crowd tolerance slider", () => {
+  it("states each band's per-minute count on the same side as the backend", () => {
+    const wrapper = mount(ToleranceSlider, {props: {modelValue: 2}});
+
+    const ranges = wrapper.findAll(".slider-label-range").map((tag) => tag.text());
+    expect(ranges).toEqual(["Under 15", "15-40", "Over 40"]);
+    // 15 and 40 belong to Moderate, so neither may be claimed by a neighbour.
+    expect(ranges[0]).not.toContain("15-");
+    expect(ranges[2]).not.toContain("40-");
+  });
+
+  it("names the bands alongside their counts", () => {
+    const wrapper = mount(ToleranceSlider, {props: {modelValue: 2}});
+
+    const names = wrapper.findAll(".slider-label-name").map((tag) => tag.text());
+    expect(names).toEqual(["Low", "Moderate", "High"]);
+  });
+
+  it("speaks the count with the band, so it is not sighted-only", () => {
+    const wrapper = mount(ToleranceSlider, {props: {modelValue: 1}});
+
+    expect(wrapper.get('input[type="range"]').attributes("aria-valuetext")).toBe(
+      "Low, under 15 people a minute",
+    );
+  });
+
+  it("reports the band a walker drags to", async () => {
+    const wrapper = mount(ToleranceSlider, {props: {modelValue: 1}});
+
+    await wrapper.get('input[type="range"]').setValue("3");
+
+    expect(wrapper.emitted("update:modelValue")).toEqual([[3]]);
+  });
+});

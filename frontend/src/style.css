@@ -15,6 +15,90 @@
   flex-direction: column;
 }
 
+/* -------------------------------------------------------------------- home */
+
+/*
+ * The first screen holds one decision and nothing else. It is centred rather
+ * than stacked from the top because there is no second thing to scroll to, and
+ * the mark is set in ink rather than colour: the palette rule that saturation
+ * only ever means sensory load holds here too, brand included.
+ */
+.home {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.home-inner {
+  width: 100%;
+  max-width: var(--column);
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-4) calc(var(--space-7) + env(safe-area-inset-bottom));
+}
+
+.home-brand {
+  margin-bottom: var(--space-6);
+}
+
+/*
+ * Drawn as a mask filled with the current ink rather than placed as an image:
+ * the source art is solid black, which would all but disappear against
+ * bluestone, and this way the mark follows the wordmark into either theme
+ * without a second asset or an inversion filter.
+ *
+ * Measured in em, so it is tied to the wordmark it shares a line with and
+ * follows that clamp up and down instead of keeping a size of its own.
+ */
+.home-mark {
+  /* The artwork's own 192x99 proportions, so no space is reserved for padding
+     the file does not carry. */
+  height: 0.78em;
+  width: calc(0.78em * 192 / 99);
+  flex: none;
+  background: currentColor;
+  mask: url("/footprints.png") no-repeat center / contain;
+  -webkit-mask: url("/footprints.png") no-repeat center / contain;
+}
+
+/* The mark and the word share one line, so the floor of the clamp is lower
+   than the wordmark alone needed: together they have to clear 320px. */
+.home-wordmark {
+  display: flex;
+  margin: 0 0 var(--space-3);
+  align-items: center;
+  gap: 0.28em;
+  font-size: clamp(1.75rem, 9vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+/* The rule above the slogan is the only division on the screen: it separates
+   what the app is called from what it claims to do. */
+.home-slogan {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-size: 1.0625rem;
+  line-height: 1.35;
+}
+
+.home-lede {
+  margin: 0 0 var(--space-5);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+
+.home-note {
+  margin: var(--space-3) 0 0;
+  color: var(--ink-faint);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 /* Present to a screen reader, absent to the eye. Used for the per-screen
    heading that focus moves to, on screens whose design carries no visible
    title. */
@@ -849,11 +933,56 @@ input[type="datetime-local"] {
   accent-color: var(--ink);
 }
 
+/* Equal columns rather than space-between, so each band sits over the stretch
+   of track that selects it and the counts line up under their own names. */
 .slider-labels {
-  display: flex;
-  justify-content: space-between;
-  color: var(--ink-faint);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   font-size: 0.75rem;
+}
+
+.slider-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.slider-label:first-child {
+  text-align: left;
+}
+
+.slider-label:nth-child(2) {
+  text-align: center;
+}
+
+.slider-label:last-child {
+  text-align: right;
+}
+
+/* Same load scale as everywhere else: colour marks the band, not decoration. */
+.slider-label-name {
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+
+.slider-label:first-child .slider-label-name {
+  color: var(--band-low);
+}
+
+.slider-label:nth-child(2) .slider-label-name {
+  color: var(--band-moderate);
+}
+
+.slider-label:last-child .slider-label-name {
+  color: var(--band-high);
+}
+
+/* A measured quantity, set in the figures face like every other count in the
+   app, so it does not read as part of the label's prose. */
+.slider-label-range {
+  color: var(--ink-faint);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------ refuge finder */

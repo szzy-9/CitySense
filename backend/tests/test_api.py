@@ -238,7 +238,7 @@ def test_invalid_crowd_tolerance_is_rejected(client):
     )
 
     assert response.status_code == 400
-    assert "Low, Medium, or High" in response.get_json()["error"]
+    assert "Low, Moderate, or High" in response.get_json()["error"]
 
 
 def test_departure_time_must_include_a_timezone(client):

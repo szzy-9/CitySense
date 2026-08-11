@@ -72,16 +72,16 @@ The other two were labelled "Another route stays calmer at its busiest point."
 `congestion_avoidable` was true for that request.
 
 The crowd tolerance slider is a limit the recommendation is measured against, not a switch that turns avoidance on.
-At its default of Medium the same selection runs; no first-time setup step exists.
+At its default of Moderate the same selection runs; no first-time setup step exists.
 
 ### AC 1.2b - Reason shown when congestion is unavoidable
 
 **Flow**
 
-1. Plan the same trip at tolerance Low or Medium, an hour when the CBD is busy.
+1. Plan the same trip at tolerance Low or Moderate, an hour when the CBD is busy.
 2. Read the recommended card.
 
-**Seen:** at both Low and Medium every route crossed a High stretch, so the recommendation named it instead of quietly serving the least bad option:
+**Seen:** at both Low and Moderate every route crossed a High stretch, so the recommendation named it instead of quietly serving the least bad option:
 
 > Every route today goes above your crowd limit somewhere. This one stays the calmest at its busiest point.
 
