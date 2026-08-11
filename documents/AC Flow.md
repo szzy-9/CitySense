@@ -212,11 +212,55 @@ It is never shown after the stretch has been passed.
 
 If the trip slips into a later clock hour than the one the outlook was calculated for, the banner says so rather than asserting a stale band: "This reads the 1pm pattern, but you are now due there around 2pm, so check another route for a fresh outlook."
 
+### AC 2.2a and AC 2.2b - where the crowd is the destination itself
+
+The two rows above are answered by rerouting: the busy stretch is on the way, so another street avoids it.
+That answer is worthless when the busy place is where the walker is going, and until now it was the only answer offered.
+This is the same two criteria, walked against a destination no route avoids.
+
+**Flow**
+
+1. Set Crowd tolerance to Low, and Leaving to Friday 5pm.
+2. Plan Spring Street to Bourke Street Mall.
+3. Read the banner under the route comparison, before pressing Navigate.
+4. Press Navigate and walk the route in.
+
+**Seen** at planning, with the trip still uncommitted:
+
+> WHERE YOU ARE HEADING
+> Near your destination is likely high around the time you get there (5pm), based on the same weekday and hour in past weeks. No route avoids it.
+> We are confident · based on an imported historical baseline, not a live forecast.
+> [Quiet places near there]
+
+The Neon profile puts the final stretch at High with High confidence for Friday 5pm, and `congestion_avoidable` is false on every route, which is what the second sentence reports.
+The arrival hour is read off the planned departure rather than the clock, so a trip planned at 2am for a 5pm walk says 5pm.
+
+Where a later departure would clear the peak, `departure_suggestion` is offered inside this panel as "Leave at 5:45 pm instead", rather than as a separate notice about the same trip.
+Rerouting is not offered, because no other route ends anywhere else.
+
+**Seen** on approach, position stepped along the route:
+
+| Minutes to arrival | Banner |
+|---|---|
+| 26 | nothing |
+| 16 | nothing |
+| 12 | High at the destination, "in about 12 minutes" |
+| 10 | High at the destination, "in about 10 minutes" |
+| arrived | nothing |
+
+The window is fifteen minutes rather than the five the stretch warning uses.
+Choosing somewhere else to be, or turning back, takes longer than stepping onto a different street, and the decision has to be made before the walker is standing in the crowd.
+The only actions are "Quiet places near there", which opens the refuge list against the destination rather than the start, and "Keep going".
+Leaving later is not offered here, because someone already walking no longer has that choice.
+
+Waving the warning away while planning settles that trip; it does not waive the approach warning, which is the walker's last chance to act.
+
 ---
 
 ## Notes
 
 - Both US 2.2 rows are also covered by automated tests in `frontend/tests/routeDisplay.test.js`: alert before the stretch, gone after it, the five-minute floor and its countdown exemption, the one-hour ceiling, tolerance and confidence gating, example routes, and the hour-drift wording.
+- The destination case adds `frontend/tests/destinationAlert.spec.js`, which plans the trip and walks it in through the screens, and further cases in `routeDisplay.test.js` covering the fifteen-minute window, arrival, the planned-departure arrival hour, and the rule that only one of the two banners speaks for the last stretch.
 - Two defects were found during this walkthrough and fixed. The Neon `sensor_location` table keeps the machine code in `sensor_name` and the street in `sensor_description`, and the repository was reading the code, so cards said "Busiest near ElFi_T". And engine pool options were computed once from the environment's database, so with Neon configured the whole backend suite failed at fixture setup before a single test ran.
 - The load bands changed with the Neon migration, from 50 and 150 people per minute to 15 and 40. The same corridor that read Low under the old boundaries now reads Moderate to High, which is worth confirming with whoever set them.
 - OpenRouteService occasionally times out at the six-second budget and the app falls back to example routes, which are labelled "Example route" and are excluded from forecasting on purpose. Retrying Find Routes restores live routing.

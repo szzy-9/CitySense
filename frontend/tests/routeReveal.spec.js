@@ -101,12 +101,30 @@ describe("bringing found routes into view", () => {
     const wrapper = await planTrip();
 
     const section = wrapper.get('[data-testid="routes-section"]').element;
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalled();
     expect(scrollIntoView.mock.instances[0]).toBe(section);
     expect(scrollIntoView.mock.calls[0][0]).toEqual({
       behavior: "smooth",
       block: "start",
     });
+    wrapper.unmount();
+  });
+
+  it("jumps instead when the browser never runs the animation", async () => {
+    // A backgrounded tab gets no frames, so the animated scroll never starts
+    // and the walker returns to a screen that did not move.
+    const wrapper = await planTrip();
+    const section = wrapper.get('[data-testid="routes-section"]').element;
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Filtered by element: an earlier test's pending fallback fires on its own
+    // section during this wait, and is not what is being asserted here.
+    const behaviours = scrollIntoView.mock.calls
+      .filter((_call, index) => scrollIntoView.mock.instances[index] === section)
+      .map(([options]) => options.behavior);
+
+    expect(behaviours).toEqual(["smooth", "auto"]);
     wrapper.unmount();
   });
 

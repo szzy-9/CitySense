@@ -16,6 +16,7 @@ const props = defineProps({
   },
 });
 
+const root = ref(null);
 const open = ref(false);
 const loading = ref(false);
 const message = ref("");
@@ -96,6 +97,23 @@ function closeFinder() {
   message.value = "";
 }
 
+/*
+ * Open already looking somewhere in particular, rather than at whichever
+ * position this component would have asked for itself. A destination warning
+ * has already named the place the walker needs alternatives near, so making
+ * them press through the entry card to say it again would be asking twice.
+ */
+function openAt(origin) {
+  open.value = true;
+  refuges.value = [];
+  message.value = "";
+  return loadRefuges(origin);
+}
+
+// root travels with the opener so a caller can bring the results onto the
+// screen; a list that loads below the fold reads as a button that did nothing.
+defineExpose({ openAt, closeFinder, root });
+
 function formatDistance(metres) {
   if (!Number.isFinite(metres)) {
     return "Distance unavailable";
@@ -107,10 +125,10 @@ function formatDistance(metres) {
 </script>
 
 <template>
-  <section class="refuge-finder" aria-labelledby="refuge-finder-title">
+  <section ref="root" class="refuge-finder" aria-labelledby="refuge-finder-title">
     <div v-if="!open" class="refuge-finder-entry">
       <p class="screen-label">Quiet places</p>
-      <h3 id="refuge-finder-title" class="section-title">Need a nearby place to pause?</h3>
+      <p id="refuge-finder-title" class="section-title">Need a nearby place to pause?</p>
       <button
         type="button"
         class="secondary-button"

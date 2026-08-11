@@ -18,14 +18,17 @@ import {
   monitorAlertSignature,
   navigationSummary,
   nextFollowMode,
+  destinationAlertSignature,
   predictiveAlertSignature,
   preserveCurrentRouteResult,
   remainingRouteCoordinates,
   remainingRouteDistance,
   segmentsAheadOfLocation,
   selectCurrentRouteStep,
+  selectDestinationAlert,
   selectPredictiveAlert,
   selectRouteDeparture,
+  shouldShowDestinationAlert,
   shouldShowMonitorAlert,
   shouldShowPredictiveAlert,
   toTimezoneAwareDeparture,
@@ -501,4 +504,171 @@ test("dismissing a predicted-crowding warning keeps it dismissed", () => {
   assert.equal(shouldShowPredictiveAlert(alert, ""), true);
   assert.equal(shouldShowPredictiveAlert(alert, signature), false);
   assert.equal(shouldShowPredictiveAlert(null, ""), false);
+});
+
+/*
+ * The same four-block walk, but the busy block is the last one: the walker's
+ * destination rather than somewhere they pass through. AC 2.2a and AC 2.2b ask
+ * for a warning before arrival with enough lead time to act, and the acting
+ * here cannot be a reroute.
+ */
+function destinationRoute(overrides = {}) {
+  return predictedRoute({
+    bands: ["LOW", "LOW", "LOW", "HIGH"],
+    ...overrides,
+  });
+}
+
+test("a busy destination is named while the trip can still be delayed", () => {
+  const alert = selectDestinationAlert(destinationRoute(), "MEDIUM", {
+    now: new Date(2026, 7, 4, 8, 0).getTime(),
+  });
+
+  assert.equal(alert.predicted_condition, "HIGH");
+  assert.equal(alert.phase, "planning");
+  assert.equal(alert.lead_minutes, 40);
+  assert.equal(alert.arrival_label, "8am");
+  assert.match(alert.message, /Near your destination is likely high/);
+  assert.match(alert.message, /around the time you get there \(8am\)/);
+  assert.doesNotMatch(alert.message, /HIGH|NO_DATA/);
+});
+
+test("the destination warning counts down to arrival while walking", () => {
+  const alert = selectDestinationAlert(destinationRoute(), "MEDIUM", {
+    phase: "approach",
+    remainingMinutes: 12,
+  });
+
+  assert.equal(alert.phase, "approach");
+  assert.equal(alert.lead_minutes, 12);
+  assert.match(alert.message, /when you arrive, in about 12 minutes/);
+});
+
+test("on approach the warning waits until arrival is close enough to act on", () => {
+  // Half an hour out, a walker is being told about a place they already chose.
+  assert.equal(
+    selectDestinationAlert(destinationRoute(), "MEDIUM", {
+      phase: "approach",
+      remainingMinutes: 30,
+    }),
+    null,
+  );
+
+  assert.notEqual(
+    selectDestinationAlert(destinationRoute(), "MEDIUM", {
+      phase: "approach",
+      remainingMinutes: 15,
+    }),
+    null,
+  );
+});
+
+test("a walk longer than the hour the pattern covers raises nothing", () => {
+  assert.equal(
+    selectDestinationAlert(destinationRoute({ duration_minutes: 400 }), "MEDIUM"),
+    null,
+  );
+});
+
+test("the destination warning stops once the walker has arrived", () => {
+  assert.equal(
+    selectDestinationAlert(destinationRoute(), "MEDIUM", {
+      phase: "approach",
+      remainingMinutes: 1,
+      arrived: true,
+    }),
+    null,
+  );
+});
+
+test("a destination inside the walker's own limit is not warned about", () => {
+  assert.equal(selectDestinationAlert(destinationRoute(), "HIGH"), null);
+});
+
+test("a thin pattern for the destination is not worth interrupting over", () => {
+  const route = destinationRoute({
+    confidences: ["HIGH", "HIGH", "HIGH", "LOW"],
+  });
+
+  assert.equal(selectDestinationAlert(route, "MEDIUM"), null);
+});
+
+test("an example route never forecasts the destination either", () => {
+  assert.equal(
+    selectDestinationAlert(destinationRoute({ route_source: "fallback" }), "MEDIUM"),
+    null,
+  );
+});
+
+test("an unavoidable destination says so, rather than implying a reroute", () => {
+  const route = destinationRoute();
+  route.congestion_avoidable = false;
+
+  const alert = selectDestinationAlert(route, "MEDIUM");
+
+  assert.equal(alert.avoidable, false);
+  assert.match(alert.message, /No route avoids it\./);
+});
+
+test("the destination owns the last stretch, so only one warning is raised", () => {
+  const route = destinationRoute();
+  const standingAtTheStart = location(144.96, -37.81);
+
+  // Without the exclusion the same block would produce a second warning, one
+  // that offers a reroute the walker cannot use.
+  assert.equal(
+    selectPredictiveAlert(route, standingAtTheStart, "MEDIUM").segment_index,
+    3,
+  );
+  assert.equal(
+    selectPredictiveAlert(route, standingAtTheStart, "MEDIUM", {
+      excludeFinalSegment: true,
+    }),
+    null,
+  );
+  assert.equal(selectDestinationAlert(route, "MEDIUM").segment_index, 3);
+});
+
+test("a trip planned for a later hour arrives in that hour, not this one", () => {
+  // Planned at 2am for a 5pm departure. Reading the arrival off the clock said
+  // "due there around 2am" and then called the 5pm pattern the wrong one.
+  const planningNow = new Date(2026, 7, 12, 2, 0);
+  const departure = new Date(2026, 7, 14, 17, 0);
+  const route = destinationRoute({
+    duration_minutes: 16,
+    predicted_for: new Date(2026, 7, 14, 17, 16).toISOString(),
+  });
+
+  const alert = selectDestinationAlert(route, "MEDIUM", {
+    now: planningNow.getTime(),
+    departureIso: departure.toISOString(),
+  });
+
+  assert.equal(alert.arrival_label, "5pm");
+  assert.match(alert.message, /around the time you get there \(5pm\)/);
+  assert.doesNotMatch(alert.message, /2am/);
+  assert.doesNotMatch(alert.message, /pattern, but you are now due/);
+});
+
+test("without a planned departure the walker is leaving now", () => {
+  const now = new Date(2026, 7, 12, 9, 0);
+  const alert = selectDestinationAlert(destinationRoute({ duration_minutes: 40 }), "MEDIUM", {
+    now: now.getTime(),
+  });
+
+  assert.equal(alert.arrival_label, "9am");
+});
+
+test("waving the warning away at planning does not waive it on approach", () => {
+  const planning = selectDestinationAlert(destinationRoute(), "MEDIUM");
+  const approaching = selectDestinationAlert(destinationRoute(), "MEDIUM", {
+    phase: "approach",
+    remainingMinutes: 8,
+  });
+  const dismissed = destinationAlertSignature(planning);
+
+  assert.equal(dismissed, "destination:planning:HIGH");
+  assert.equal(shouldShowDestinationAlert(planning, dismissed), false);
+  assert.equal(shouldShowDestinationAlert(approaching, dismissed), true);
+  assert.equal(shouldShowDestinationAlert(null, ""), false);
 });
