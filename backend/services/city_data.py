@@ -39,6 +39,13 @@ def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
                 _live_cache["snapshot"] = snapshot
                 _live_cache["stored_at"] = time.monotonic()
             return snapshot
+        except httpx.HTTPStatusError as error:
+            logger.warning(
+                "City pedestrian API HTTP error: status=%s url=%s response=%s",
+                error.response.status_code,
+                error.request.url,
+                error.response.text[:200],
+            )
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             logger.warning(
                 "City pedestrian data is unavailable; using fallback data (%s)",
