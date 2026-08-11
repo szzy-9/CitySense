@@ -4,6 +4,7 @@ import ssl
 import time
 from pathlib import Path
 
+import certifi
 import httpx
 from flask import has_app_context
 
@@ -26,7 +27,13 @@ COUNT_PAGES = 5
 _live_cache = {"snapshot": None, "stored_at": 0.0}
 
 
-CITY_API_SSL_CONTEXT = ssl.create_default_context()
+# The city's API is pinned to TLS 1.2 because the handshake stalls when Render
+# negotiates 1.3 with it. The certificates have to come from certifi rather than
+# the operating system: a bare create_default_context() reads the system trust
+# store, which is empty on a macOS Python build, so every live read failed
+# verification locally and fell back to sample data. httpx uses certifi for
+# exactly this reason, and supplying a context of our own opted out of it.
+CITY_API_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 CITY_API_SSL_CONTEXT.minimum_version = ssl.TLSVersion.TLSv1_2
 CITY_API_SSL_CONTEXT.maximum_version = ssl.TLSVersion.TLSv1_2
 logger.info(
