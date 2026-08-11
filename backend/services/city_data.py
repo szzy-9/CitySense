@@ -1,5 +1,6 @@
 import json
 import logging
+import ssl
 import time
 from pathlib import Path
 
@@ -23,6 +24,11 @@ LIVE_CACHE_SECONDS = 60
 COUNT_PAGE_SIZE = 100
 COUNT_PAGES = 5
 _live_cache = {"snapshot": None, "stored_at": 0.0}
+
+
+CITY_API_SSL_CONTEXT = ssl.create_default_context()
+CITY_API_SSL_CONTEXT.minimum_version = ssl.TLSVersion.TLSv1_2
+CITY_API_SSL_CONTEXT.maximum_version = ssl.TLSVersion.TLSv1_2
 
 
 def get_pedestrian_snapshot(use_live=True, timeout=6, client=None):
@@ -92,7 +98,10 @@ def _cache_is_current():
 
 def _read_live_data(timeout, client=None):
     owns_client = client is None
-    http_client = client or httpx.Client(timeout=timeout)
+    http_client = client or httpx.Client(
+        timeout=timeout,
+        verify=CITY_API_SSL_CONTEXT,
+    )
 
     try:
         count_rows = _read_count_pages(http_client)
@@ -115,6 +124,7 @@ def _read_live_data(timeout, client=None):
             raise ValueError("The city datasets returned no matching sensors")
 
         snapshot["sensor_location_source"] = location_source
+        logger.info("City pedestrian API connection succeeded using TLS 1.2")
         return snapshot
     finally:
         if owns_client:
