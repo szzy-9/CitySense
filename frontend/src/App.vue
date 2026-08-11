@@ -960,7 +960,7 @@ function readPositionAccuracy(position) {
           <LocationSearch
             field-id="start"
             label="From"
-            placeholder="Search a Melbourne address"
+            placeholder="Search a Melbourne CBD address"
             :model-value="startLocation"
             :allow-current-location="true"
             :locating="locating"
