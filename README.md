@@ -82,6 +82,9 @@ Backend variables are configured in the ignored root `.env` file. Start from [.e
 | `REQUEST_TIMEOUT_SECONDS` | Timeout for external HTTP requests. |
 | `ALLOWED_ORIGINS` | Comma-separated trusted frontend origins for CORS. |
 | `FLASK_DEBUG` | Enable Flask debug mode locally. Keep disabled in production. |
+| `ENABLE_DEMO_AUTH` | Enable the shared expo password gate. Keep `false` locally. |
+| `DEMO_ACCESS_PASSWORD_HASH` | Werkzeug password hash for demo access; never store the plaintext password. |
+| `SESSION_SECRET_KEY` | Random secret used to sign Flask session cookies. |
 | `PORT` | Flask or Gunicorn port. |
 | `PYTHONUNBUFFERED` | Enable unbuffered Python logs in production. |
 | `PREDICTION_MEDIUM_MIN_SAMPLES` | Minimum samples for MEDIUM prediction confidence. |
@@ -115,3 +118,5 @@ pnpm run build
 The production target is one Render Docker Web Service connected to Neon PostgreSQL. Flask serves the built Vue application and `/api` routes from the same origin.
 
 See [docs/DEPLOY_RENDER_NEON.md](docs/DEPLOY_RENDER_NEON.md) for setup, environment variables, schema initialization, data loading, and smoke tests.
+
+Security configuration and verification are documented in [docs/SECURITY.md](docs/SECURITY.md).

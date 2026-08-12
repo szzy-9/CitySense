@@ -56,6 +56,15 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = read_engine_options(SQLALCHEMY_DATABASE_URI)
     MAX_CONTENT_LENGTH = 64 * 1024
+    IS_PRODUCTION = os.getenv("FLASK_ENV", "development").lower() == "production"
+    ENABLE_DEMO_AUTH = read_boolean("ENABLE_DEMO_AUTH", False)
+    DEMO_ACCESS_PASSWORD_HASH = os.getenv(
+        "DEMO_ACCESS_PASSWORD_HASH", ""
+    ).strip()
+    SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "").strip()
+    SESSION_COOKIE_SECURE = IS_PRODUCTION
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
 
     FRONTEND_ORIGIN = os.getenv(
         "ALLOWED_ORIGINS",

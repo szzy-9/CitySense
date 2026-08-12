@@ -1,8 +1,18 @@
 from datetime import datetime, timezone
 
 import httpx
-from flask import Flask, jsonify, request, send_from_directory
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template_string,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from flask_cors import CORS
+from werkzeug.security import check_password_hash
 
 from backend.config import Config, ROOT_DIR, read_engine_options
 from backend.database import database_health
@@ -38,6 +48,37 @@ from backend.services.scoring import monitor_route, score_routes
 
 ALLOWED_CROWD_TOLERANCE = {"LOW", "MEDIUM", "HIGH"}
 LIVE_DEPARTURE_WINDOW_SECONDS = 5 * 60
+PUBLIC_DEMO_PATHS = {"/login", "/api/health"}
+PUBLIC_STATIC_PREFIXES = ("/assets/", "/fonts/")
+PUBLIC_STATIC_FILES = {"/favicon.ico", "/footprints.png"}
+LOGIN_TEMPLATE = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CitySense demo access</title>
+  </head>
+  <body>
+    <main>
+      <h1>CitySense demo access</h1>
+      <p>Enter the expo password to continue.</p>
+      {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+      <form method="post" action="{{ url_for('login') }}">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+          autofocus
+        >
+        <button type="submit">Continue</button>
+      </form>
+    </main>
+  </body>
+</html>
+"""
 
 
 def create_app(test_config=None):
@@ -67,6 +108,18 @@ def create_app(test_config=None):
         methods=["GET", "POST", "OPTIONS"],
     )
 
+    @app.before_request
+    def require_demo_authentication():
+        if not app.config["ENABLE_DEMO_AUTH"]:
+            return None
+        if request.method == "OPTIONS" or _is_public_demo_path(request.path):
+            return None
+        if session.get("demo_authenticated") is True:
+            return None
+        if request.path.startswith("/api/"):
+            return _error("Authentication required.", 401)
+        return redirect(url_for("login"))
+
     @app.after_request
     def add_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -84,11 +137,47 @@ def create_app(test_config=None):
             "font-src 'self'; "
             "connect-src 'self'"
         )
+        if app.config["IS_PRODUCTION"]:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.path.startswith("/assets/"):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if not app.config["ENABLE_DEMO_AUTH"]:
+            return redirect(url_for("frontend"))
+        if session.get("demo_authenticated") is True:
+            return redirect(url_for("frontend"))
+
+        error_message = None
+        if request.method == "POST":
+            password_hash = app.config["DEMO_ACCESS_PASSWORD_HASH"]
+            if not password_hash or not app.secret_key:
+                return render_template_string(
+                    LOGIN_TEMPLATE,
+                    error="Demo access is not configured.",
+                ), 503
+
+            password = request.form.get("password", "")
+            try:
+                password_matches = check_password_hash(password_hash, password)
+            except (TypeError, ValueError):
+                password_matches = False
+            if password_matches:
+                session.clear()
+                session["demo_authenticated"] = True
+                return redirect(url_for("frontend"))
+            error_message = "Incorrect password."
+
+        return render_template_string(LOGIN_TEMPLATE, error=error_message)
+
+    @app.post("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("login"))
 
     @app.get("/")
     def frontend():
@@ -403,6 +492,14 @@ def create_app(test_config=None):
 
 def _error(message, status):
     return jsonify({"error": message}), status
+
+
+def _is_public_demo_path(path):
+    return (
+        path in PUBLIC_DEMO_PATHS
+        or path in PUBLIC_STATIC_FILES
+        or path.startswith(PUBLIC_STATIC_PREFIXES)
+    )
 
 
 def _unique_route_sensors(routes):

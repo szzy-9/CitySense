@@ -15,7 +15,13 @@ services:
       - key: FLASK_DEBUG
         value: "false"
       - key: ALLOWED_ORIGINS
-        value: https://localhost
+        sync: false
+      - key: ENABLE_DEMO_AUTH
+        value: "true"
+      - key: DEMO_ACCESS_PASSWORD_HASH
+        sync: false
+      - key: SESSION_SECRET_KEY
+        sync: false
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: USE_LIVE_CITY_DATA
