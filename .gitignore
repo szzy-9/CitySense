@@ -33,3 +33,8 @@ data/processed/*
 *.pptx
 *.docx
 *.pdf
+
+# Deliverables handed to us live here and stay out of the repo, but the
+# requirements written in markdown are the shared record and stay in it.
+documents/*
+!documents/*.md

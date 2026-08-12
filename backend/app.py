@@ -210,11 +210,11 @@ def create_app(test_config=None):
                         if refuge_source == "NEON" and refuge_list
                         else False
                     ),
-                    # "message": (
-                    #     "Check the place when you arrive; conditions change."
-                    #     if refuge_source == "NEON"
-                    #     else "We picked these places ourselves. Check them when you arrive."
-                    # ),
+                    "message": (
+                        "Check the place when you arrive; conditions change."
+                        if refuge_source == "NEON"
+                        else "We picked these places ourselves. Check them when you arrive."
+                    ),
                 },
             }
         )

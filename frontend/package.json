@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test tests/*.test.js && vitest run tests/components.spec.js tests/homeScreen.spec.js tests/platformServices.spec.js tests/predictiveAlert.spec.js",
+    "test": "node --test tests/*.test.js && vitest run tests/components.spec.js tests/demoLocation.spec.js tests/destinationAlert.spec.js tests/homeScreen.spec.js tests/platformServices.spec.js tests/predictiveAlert.spec.js tests/routeReveal.spec.js",
     "preview": "vite preview",
     "cap:sync": "cap sync android",
     "android:open": "cap open android"

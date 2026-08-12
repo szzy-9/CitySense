@@ -585,9 +585,15 @@ input[type="datetime-local"] {
 
 /* ------------------------------------------------------------- route cards */
 
+/* Found routes are scrolled up to, so the label needs air above it rather than
+   sitting flush against the top edge of the screen. */
+.routes-section {
+  scroll-margin-top: var(--space-5);
+}
+
 .results {
   display: flex;
-  margin-top: var(--space-6);
+  margin-top: var(--space-4);
   flex-direction: column;
   gap: var(--space-4);
 }
@@ -1002,6 +1008,21 @@ input[type="datetime-local"] {
   font-size: 0.875rem;
 }
 
+/*
+ * QUIET PLACES is what this panel is; the line under it only says what the
+ * list contains, so it is set below the label rather than above it. Sized
+ * here rather than by demoting the heading to a paragraph: the twelve place
+ * names are h3, and without an h2 over them the page skips a level for
+ * anyone moving through it by heading.
+ */
+.refuge-finder .section-title {
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .refuge-finder-heading {
   display: flex;
   margin-bottom: var(--space-3);
@@ -1018,20 +1039,36 @@ input[type="datetime-local"] {
   flex: none;
 }
 
+/*
+ * Places to read, not places to press.
+ *
+ * These entries used to be bordered, rounded, raised blocks, which is the
+ * shape this interface reserves for things that do something when touched.
+ * Twelve of them stacked evenly read as a menu, and the first feedback a
+ * walker got was pressing one and having nothing happen. A hairline between
+ * rows separates them without dressing them as controls.
+ */
 .refuge-result-list {
   display: flex;
   margin: var(--space-4) 0 0;
   padding: 0;
   flex-direction: column;
-  gap: var(--space-3);
+  /* The rule does the separating; a gap as well would leave it floating in
+     the middle of the space rather than dividing it. */
+  gap: 0;
   list-style: none;
 }
 
 .refuge-result {
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--ground);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+/* The heading above the list is already a division. A rule immediately under
+   it would read as a second one. */
+.refuge-result:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .refuge-result h3 {
@@ -1389,6 +1426,7 @@ input[type="datetime-local"] {
 /* ------------------------------------------------------------ data status */
 
 .data-status-card {
+  margin-top: var(--space-3);
   margin-bottom: var(--space-5);
   padding: var(--space-4);
   border: 1px solid var(--line);

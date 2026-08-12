@@ -18,7 +18,7 @@ defineEmits(["update:modelValue", "enter"]);
         <h1 class="home-wordmark" data-screen-heading tabindex="-1">
           CitySense<span class="home-mark" aria-hidden="true"></span>
         </h1>
-        <p class="home-slogan">CitySense travels through the city with you.</p>
+        <p class="home-slogan">CitySense creating a calmer path with you.</p>
       </div>
 
      

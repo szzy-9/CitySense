@@ -25,6 +25,7 @@ import {
   buildCalmestComparison,
   canStartReroute,
   compareObservedPeaks,
+  destinationAlertSignature,
   formatConfidence,
   formatLoadLevel,
   formatRouteRoles,
@@ -35,7 +36,9 @@ import {
   predictiveAlertSignature,
   preserveCurrentRouteResult,
   remainingRouteCoordinates,
+  selectDestinationAlert,
   selectPredictiveAlert,
+  shouldShowDestinationAlert,
   shouldShowMonitorAlert,
   shouldShowPredictiveAlert,
   selectRouteDeparture,
@@ -83,7 +86,15 @@ const raisedPredictiveSignature = ref("");
 const navigationClock = ref(Date.now());
 const pendingAlternative = ref(null);
 const alternativeLoading = ref(false);
+const routesSection = ref(null);
+const dismissedDestinationSignature = ref("");
+const planRefugeFinder = ref(null);
+const navigateRefugeFinder = ref(null);
+const showDestinationRefuges = ref(false);
 const showLocationSimulator = import.meta.env.DEV;
+// Long enough for an animated scroll to have visibly started, short enough that
+// the jump lands before the walker decides nothing happened.
+const SCROLL_SETTLE_MILLISECONDS = 300;
 const arrivalDistanceMetres = Number(
   import.meta.env.VITE_ARRIVAL_DISTANCE_METERS || 35,
 );
@@ -195,6 +206,10 @@ const predictiveAlert = computed(() => {
     {
       now: navigationClock.value,
       raisedSignature: raisedPredictiveSignature.value,
+      // The last stretch is the destination, and destinationAlert speaks for
+      // it. Two banners about one place, one of them offering a reroute that
+      // cannot help, is worse than either alone.
+      excludeFinalSegment: true,
     },
   );
   return shouldShowPredictiveAlert(alert, dismissedPredictiveSignature.value)
@@ -212,6 +227,60 @@ function dismissPredictiveAlert() {
   dismissedPredictiveSignature.value = predictiveAlertSignature(predictiveAlert.value);
 }
 
+/*
+ * The outlook for the place the walker is going to, which no route avoids.
+ *
+ * Raised at planning, where the answer is usually to arrive later, and again
+ * on approach, where the answer is usually somewhere quiet nearby. The two are
+ * the same warning, so the phase travels with it and the copy and the choices
+ * follow from that.
+ */
+const destinationAlert = computed(() => {
+  const onNavigateScreen = currentScreen.value === "navigate";
+  const alert = selectDestinationAlert(selectedRoute.value, crowdTolerance.value, {
+    now: navigationClock.value,
+    phase: onNavigateScreen ? "approach" : "planning",
+    remainingMinutes: navigation.value?.remainingMinutes ?? null,
+    arrived: Boolean(navigation.value?.arrived),
+    // A trip can be planned for an hour that has not happened yet, and the
+    // arrival time has to be read off that departure rather than off the clock.
+    // Once walking, the departure is now.
+    departureIso: onNavigateScreen ? null : routeDepartureIso.value || null,
+  });
+  return shouldShowDestinationAlert(alert, dismissedDestinationSignature.value)
+    ? alert
+    : null;
+});
+
+function dismissDestinationAlert() {
+  dismissedDestinationSignature.value = destinationAlertSignature(destinationAlert.value);
+}
+
+/*
+ * The one action that still helps once the crowd is at the far end of the
+ * trip. The finder is opened already pointed at the destination, because the
+ * walker has just been told that is the place to find an alternative near.
+ */
+async function showQuietPlacesNearDestination() {
+  const destination = result.value?.end;
+  if (!isConfirmedLocation(destination)) {
+    return;
+  }
+
+  // The planner already carries a finder further down the screen; the navigate
+  // screen has none until this is asked for.
+  if (currentScreen.value === "navigate") {
+    showDestinationRefuges.value = true;
+    await nextTick();
+    await navigateRefugeFinder.value?.openAt(destination);
+    bringIntoView(navigateRefugeFinder.value?.root);
+    return;
+  }
+
+  await planRefugeFinder.value?.openAt(destination);
+  bringIntoView(planRefugeFinder.value?.root);
+}
+
 const canFindRoutes = computed(() => {
   return (
     isConfirmedLocation(startLocation.value) &&
@@ -227,7 +296,7 @@ const demoLocationNotice = computed(() => {
   }
   const point = demoLocationOrigin();
   return (
-    "Demo Mode is on. CitySense is reporting a fixed position at " +
+    "Demo Mode is on. CitySense is reporting a random CBD position: at " +
     `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}`
   );
 });
@@ -243,7 +312,7 @@ async function toggleDemoLocation() {
   currentLocation.value = null;
   currentAccuracy.value = null;
   positionMessage.value = demoLocation.value
-    ? "Demo Mode is on. Positions come from a fixed CBD point."
+    ? "Demo Mode is on. Positions come from a random CBD point."
     : "Demo Mode is off. Positions come from this device again.";
 
   await stopLocationTracking();
@@ -380,7 +449,54 @@ async function useCurrentLocation() {
 }
 
 async function findRoutes() {
-  await requestRoutes();
+  const body = await requestRoutes();
+  if (body) {
+    await revealRoutes();
+  }
+}
+
+/*
+ * The routes render below the fold on a phone, so a walker who has just
+ * pressed the button is left looking at the form that produced them and no
+ * sign anything happened. Bring the comparison up to the top of the screen
+ * instead, and let a walker who has asked for less motion have it without the
+ * animation.
+ */
+async function revealRoutes() {
+  await nextTick();
+  bringIntoView(routesSection.value);
+}
+
+function bringIntoView(element) {
+  if (typeof element?.scrollIntoView !== "function") {
+    return;
+  }
+
+  const stillMotion = globalThis.matchMedia?.(
+    "(prefers-reduced-motion: reduce)",
+  )?.matches;
+  if (stillMotion) {
+    element.scrollIntoView({ behavior: "auto", block: "start" });
+    return;
+  }
+
+  /*
+   * An animated scroll is driven by frames, and a browser gives no frames to a
+   * tab nobody is looking at. Someone who presses the button and switches away
+   * while it loads would come back to a screen that never moved, so the scroll
+   * is checked and, if it did not happen, made without the animation.
+   */
+  const before = scrollOffset();
+  element.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => {
+    if (scrollOffset() === before) {
+      element.scrollIntoView({ behavior: "auto", block: "start" });
+    }
+  }, SCROLL_SETTLE_MILLISECONDS);
+}
+
+function scrollOffset() {
+  return globalThis.document?.scrollingElement?.scrollTop ?? globalThis.scrollY ?? 0;
 }
 
 async function requestRoutes(options = {}) {
@@ -416,6 +532,10 @@ async function requestRoutes(options = {}) {
     alternativePreparedForSignature = "";
     monitorAlert.value = null;
     dismissedPredictiveSignature.value = "";
+    // A fresh set of routes is a fresh outlook for the far end of the trip, so
+    // a warning waved away for the last one is not carried over to this one.
+    dismissedDestinationSignature.value = "";
+    showDestinationRefuges.value = false;
     pendingAlternative.value = null;
     if (originOverride) {
       startLocation.value = requestOrigin;
@@ -939,7 +1059,7 @@ function readPositionAccuracy(position) {
           :class="{ 'is-on': demoLocation }"
           type="button"
           :aria-pressed="demoLocation"
-          aria-label="Demo Mode: report a fixed CBD position instead of reading this device"
+          aria-label="Demo Mode: report a random CBD position instead of reading this device"
           data-testid="demo-toggle"
           @click="toggleDemoLocation"
         >
@@ -1000,7 +1120,13 @@ function readPositionAccuracy(position) {
 
         <p v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</p>
 
-        <section aria-live="polite" aria-labelledby="routes-title">
+        <section
+          ref="routesSection"
+          class="routes-section"
+          aria-live="polite"
+          aria-labelledby="routes-title"
+          data-testid="routes-section"
+        >
           <p class="screen-label">Route comparison</p>
           <h2 id="routes-title" class="section-title">Fastest and calmest</h2>
           <p v-if="result" class="field-hint">
@@ -1020,8 +1146,50 @@ function readPositionAccuracy(position) {
           </div>
         </section>
 
+        <!--
+          Where the crowd is at the destination, the warning and the one useful
+          departure belong in the same panel. Stacked separately they read as
+          two unrelated notices about the same trip.
+        -->
         <section
-          v-if="departureSuggestion"
+          v-if="destinationAlert"
+          class="panel banner banner-warn"
+          role="alert"
+          data-testid="destination-alert"
+        >
+          <span class="banner-icon" aria-hidden="true">◷</span>
+          <p class="screen-label">Where you are heading</p>
+          <p class="panel-title">{{ destinationAlert.message }}</p>
+          <p class="panel-body">
+            {{ formatConfidence(destinationAlert.confidence) }} · based on an imported
+            historical baseline, not a live forecast.
+          </p>
+          <p v-if="departureSuggestion" class="panel-body">
+            {{ departureSuggestion.message }}
+          </p>
+          <div class="panel-actions">
+            <button
+              v-if="departureSuggestion"
+              class="secondary-button"
+              type="button"
+              :disabled="loading"
+              @click="useSuggestedDeparture"
+            >
+              Leave at {{ suggestedDepartureLabel }} instead
+            </button>
+            <button
+              class="secondary-button"
+              type="button"
+              data-testid="destination-refuges"
+              @click="showQuietPlacesNearDestination"
+            >
+              Quiet places near there
+            </button>
+          </div>
+        </section>
+
+        <section
+          v-else-if="departureSuggestion"
           class="panel"
           aria-labelledby="departure-suggestion-title"
           data-testid="departure-suggestion"
@@ -1044,7 +1212,7 @@ function readPositionAccuracy(position) {
 
         <ToleranceSlider v-model="crowdToleranceValue" />
 
-        <RefugeFinder :confirmed-origin="startLocation" />
+        <RefugeFinder ref="planRefugeFinder" :confirmed-origin="startLocation" />
       </div>
 
       <div v-else class="screen screen-navigate">
@@ -1186,6 +1354,45 @@ function readPositionAccuracy(position) {
             </button>
           </div>
         </section>
+
+        <!--
+          The last chance to act. No departure button here: a walker already on
+          the way cannot leave later, so the only thing left that helps is
+          somewhere else to be near the far end.
+        -->
+        <section
+          v-if="destinationAlert"
+          class="panel banner banner-warn"
+          role="alert"
+          data-testid="destination-alert"
+        >
+          <span class="banner-icon" aria-hidden="true">◷</span>
+          <p class="screen-label">Where you are heading</p>
+          <p class="panel-title">{{ destinationAlert.message }}</p>
+          <p class="panel-body">
+            {{ formatConfidence(destinationAlert.confidence) }} · based on an imported
+            historical baseline, not a live forecast.
+          </p>
+          <div class="panel-actions">
+            <button
+              class="secondary-button"
+              type="button"
+              data-testid="destination-refuges"
+              @click="showQuietPlacesNearDestination"
+            >
+              Quiet places near there
+            </button>
+            <button type="button" class="text-button" @click="dismissDestinationAlert">
+              Keep going
+            </button>
+          </div>
+        </section>
+
+        <RefugeFinder
+          v-if="showDestinationRefuges"
+          ref="navigateRefugeFinder"
+          :confirmed-origin="result.end"
+        />
 
         <section
           v-if="monitorAlert"

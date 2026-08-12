@@ -59,6 +59,13 @@ export const MAX_ALERT_LEAD_MINUTES = 60;
 // Mirrors the PREDICTION_MIN_ALERT_CONFIDENCE default. A thin or erratic
 // profile describes the past too loosely to interrupt someone over.
 const ALERT_MIN_CONFIDENCE_RANK = CONFIDENCE_RANK.MEDIUM;
+/*
+ * A crowd at the destination gets a longer run-up than one on the way there.
+ * Stepping onto a different street takes a moment; deciding to sit somewhere
+ * else, or to arrive later, takes longer than that, and the walker has to make
+ * that call before they are standing in it.
+ */
+export const DESTINATION_ALERT_LEAD_MINUTES = 15;
 
 export function formatLoadLevel(level) {
   return LOAD_LABELS[level] || "No Data";
@@ -410,7 +417,7 @@ export function selectPredictiveAlert(
   route,
   location,
   crowdTolerance,
-  { now = Date.now(), raisedSignature = "" } = {},
+  { now = Date.now(), raisedSignature = "", excludeFinalSegment = false } = {},
 ) {
   // Example routes are not claimed as forecasts, matching the backend's own
   // refusal to raise an alert off one.
@@ -419,8 +426,15 @@ export function selectPredictiveAlert(
   }
 
   const thresholdRank = TOLERANCE_MAX_RANK[crowdTolerance] || TOLERANCE_MAX_RANK.MEDIUM;
+  const finalIndex = (route.segments || []).length - 1;
   const candidate = segmentsAheadOfLocation(route, location).find((item) => {
     const { segment, etaMinutes } = item;
+    // The last stretch is where the walker is going, not somewhere they are
+    // passing through, and telling them to route around it would be advice
+    // they cannot take. selectDestinationAlert speaks for it instead.
+    if (excludeFinalSegment && item.index === finalIndex) {
+      return false;
+    }
     if (!segment.historical_prediction_available) {
       return false;
     }
@@ -486,6 +500,138 @@ export function shouldShowPredictiveAlert(alert, dismissedSignature) {
 
 function segmentSignature(index, band) {
   return `${index}:${band}`;
+}
+
+/*
+ * The warning for the place the walker is going to, rather than a place they
+ * are passing through.
+ *
+ * Rerouting is the answer to a busy street on the way. It is no answer at all
+ * to a busy destination: every route ends there. So the last stretch of the
+ * route is read on its own, and what the walker is offered instead is the two
+ * things that can still work - arriving later, or a quiet place nearby.
+ *
+ * Raised twice over a trip, for the two moments a walker can still act:
+ * at planning, when delaying costs nothing, and on approach, when it is the
+ * last chance to go somewhere else. Lead time is handed in rather than
+ * recomputed, because the navigate screen already knows how far off arrival is.
+ */
+export function selectDestinationAlert(
+  route,
+  crowdTolerance,
+  {
+    now = Date.now(),
+    phase = "planning",
+    remainingMinutes = null,
+    arrived = false,
+    departureIso = null,
+  } = {},
+) {
+  // Same refusal as the stretch warning: an example route is not a forecast.
+  if (!route || route.route_source !== "live" || arrived) {
+    return null;
+  }
+
+  const segments = route.segments || [];
+  const destination = segments[segments.length - 1];
+  if (!destination?.historical_prediction_available) {
+    return null;
+  }
+
+  const thresholdRank = TOLERANCE_MAX_RANK[crowdTolerance] || TOLERANCE_MAX_RANK.MEDIUM;
+  if ((LOAD_RANK[destination.predicted_band] || 0) <= thresholdRank) {
+    return null;
+  }
+  if (
+    (CONFIDENCE_RANK[destination.prediction_confidence] || 0) < ALERT_MIN_CONFIDENCE_RANK
+  ) {
+    return null;
+  }
+
+  const lead =
+    phase === "approach" ? Number(remainingMinutes) : Number(route.duration_minutes);
+  if (!Number.isFinite(lead) || lead < 0) {
+    return null;
+  }
+  // Past the hour the profile was read for, the pattern describes an hour the
+  // walker has not reached. On approach the window is tighter still: a warning
+  // an hour out about a place they are already walking to is not news.
+  if (lead > MAX_ALERT_LEAD_MINUTES) {
+    return null;
+  }
+  if (phase === "approach" && lead > DESTINATION_ALERT_LEAD_MINUTES) {
+    return null;
+  }
+
+  // Rounding down to nothing would say "in about 0 minutes", which describes
+  // standing there rather than heading there.
+  const leadMinutes = Math.max(1, Math.round(lead));
+  /*
+   * A trip planned for Friday evening arrives on Friday evening, not an hour
+   * after whenever the planning happened. Counting from the clock instead of
+   * from the departure told a walker planning at 2am that they were due at
+   * their 5pm destination "around 2am", and then flagged the 5pm pattern it
+   * had just read correctly as the wrong one.
+   */
+  const departsAt = departureIso ? Date.parse(departureIso) : Number(now);
+  const startedAt = Number.isFinite(departsAt) ? departsAt : Number(now);
+  const drift = patternHourDrift(destination.predicted_for, startedAt, lead);
+  const arrivalLabel = formatHourLabel(new Date(startedAt + lead * 60_000));
+  const avoidable = route.congestion_avoidable !== false;
+  return {
+    predicted_condition: destination.predicted_band,
+    segment_index: segments.length - 1,
+    lead_minutes: leadMinutes,
+    confidence: destination.prediction_confidence,
+    phase,
+    avoidable,
+    arrival_label: arrivalLabel,
+    source: "destination",
+    message: destinationAlertMessage(destination.predicted_band, leadMinutes, {
+      phase,
+      avoidable,
+      arrivalLabel,
+      drift,
+    }),
+  };
+}
+
+export function destinationAlertSignature(alert) {
+  if (!alert) {
+    return "";
+  }
+  // The phase is part of it on purpose: dismissing the warning while planning
+  // settles that trip, it does not waive the last chance to act on approach.
+  return `destination:${alert.phase}:${alert.predicted_condition}`;
+}
+
+export function shouldShowDestinationAlert(alert, dismissedSignature) {
+  const signature = destinationAlertSignature(alert);
+  return Boolean(signature && signature !== dismissedSignature);
+}
+
+function destinationAlertMessage(band, leadMinutes, { phase, avoidable, arrivalLabel, drift }) {
+  const level = formatLoadLevel(band).toLowerCase();
+  const minutes = leadMinutes === 1 ? "about a minute" : `about ${leadMinutes} minutes`;
+  const opening =
+    phase === "approach"
+      ? `Near your destination is likely ${level} when you arrive, in ${minutes}.`
+      : `Near your destination is likely ${level} around the time you get there ` +
+        `(${arrivalLabel}), based on the same weekday and hour in past weeks.`;
+
+  const parts = [opening];
+  // Naming it as unavoidable is what stops "check another route" reading as
+  // the obvious next move when no other route ends anywhere else.
+  if (!avoidable) {
+    parts.push("No route avoids it.");
+  }
+  if (drift) {
+    parts.push(
+      `This reads the ${drift.patternLabel} pattern, but you are now due there ` +
+        `around ${drift.arrivalLabel}.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 function predictiveAlertMessage(band, leadMinutes, drift) {
