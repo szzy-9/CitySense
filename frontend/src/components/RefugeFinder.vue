@@ -128,7 +128,7 @@ function formatDistance(metres) {
   <section ref="root" class="refuge-finder" aria-labelledby="refuge-finder-title">
     <div v-if="!open" class="refuge-finder-entry">
       <p class="screen-label">Quiet places</p>
-      <p id="refuge-finder-title" class="section-title">Need a nearby place to pause?</p>
+      <h2 id="refuge-finder-title" class="section-title">Need a nearby place to pause?</h2>
       <button
         type="button"
         class="secondary-button"
