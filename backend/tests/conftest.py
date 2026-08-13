@@ -12,6 +12,7 @@ def app():
             "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
             "USE_LIVE_CITY_DATA": False,
             "ORS_API_KEY": "",
+            "ENABLE_DEMO_AUTH": False,
             "FRONTEND_ORIGIN": (
                 "http://127.0.0.1:5173,http://localhost:5173"
             ),
